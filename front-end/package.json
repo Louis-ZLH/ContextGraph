@@ -1,5 +1,5 @@
 {
-  "name": "context-graph",
+  "name": "context-canvas",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,8 +16,10 @@
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-query-devtools": "^5.91.2",
+    "@types/nprogress": "^0.2.3",
     "@xyflow/react": "^12.10.0",
     "lucide-react": "^0.563.0",
+    "nprogress": "^0.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",

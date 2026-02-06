@@ -4,14 +4,11 @@ import (
 	"time"
 )
 
-
-
-
 type NodeEdge struct {
+	CanvasID     int64     `gorm:"index;not null" json:"canvas_id,string"`          // 冗余字段，方便按画布查所有边
 	ParentNodeID int64     `gorm:"primaryKey" json:"parent_node_id,string"`
-	ChildNodeID  int64     `gorm:"primaryKey;index" json:"child_node_id,string"` // 联合主键，同时为Child建立索引
+	ChildNodeID  int64     `gorm:"primaryKey;index" json:"child_node_id,string"`    // 联合主键 + 单独索引查父节点
 	CreatedAt    time.Time `json:"created_at"`
-    // Edge一般不软删除，直接物理删除
 }
 
 func (n *NodeEdge) TableName() string {

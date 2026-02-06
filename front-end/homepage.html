@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ContextGraph - The Neural Interface for AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'Menlo', 'monospace'],
+                    },
+                    colors: {
+                        // 定义赛博朋克色板
+                        cyber: {
+                            dark: '#050A14',    // 深邃背景
+                            panel: '#0F172A',   // 面板背景
+                            neon: '#10B981',    // 主霓虹色 (Emerald)
+                            cyan: '#06B6D4',    // 辅助霓虹色 (Cyan)
+                            purple: '#8B5CF6',  // 强调色 (Purple)
+                        }
+                    },
+                    backgroundImage: {
+                        // 复杂的径向渐变背景
+                        'cyber-gradient': 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.15) 0%, transparent 50%), radial-gradient(circle at 100% 0%, rgba(139,92,246,0.1) 0%, transparent 40%)',
+                        'grid-perspective': 'linear-gradient(rgba(16,185,129,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.1) 1px, transparent 1px)'
+                    },
+                    boxShadow: {
+                        // 霓虹灯光晕效果
+                        'neon-green': '0 0 20px rgba(16,185,129,0.4), 0 0 40px rgba(16,185,129,0.1) inset',
+                        'neon-cyan': '0 0 20px rgba(6,182,212,0.4), 0 0 40px rgba(6,182,212,0.1) inset',
+                        'glass': '0 4px 30px rgba(0, 0, 0, 0.1)',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 8s ease-in-out infinite',
+                        'spin-slow': 'spin 20s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+                            '50%': { transform: 'translateY(-10px) rotate(1deg)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 全局基础样式 */
+        body { background-color: #050A14; color: #E2E8F0; scroll-behavior: smooth; }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #050A14; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        /* 毛玻璃基础类 */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6); /* 半透明 Slate-900 */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        /* 透视网格背景 */
+        .perspective-grid {
+            position: absolute;
+            inset: 0;
+            bottom: -30%; /* 延伸到屏幕外 */
+            background-image: var(--grid-perspective);
+            background-size: 60px 60px;
+            transform: perspective(1000px) rotateX(60deg);
+            opacity: 0.15;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, transparent 80%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden font-sans bg-cyber-dark selection:bg-cyber-neon/30">
+
+    <div class="fixed inset-0 bg-cyber-gradient opacity-80 pointer-events-none"></div>
+    <div class="perspective-grid"></div>
+
+    <nav class="fixed top-0 w-full z-50 h-16 glass-panel border-b-0 border-b-white/5">
+        <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-2 font-extrabold tracking-tight text-xl">
+                <div class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-neon opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-cyber-neon"></span>
+                </div>
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                    Context<span class="text-cyber-neon">Graph</span>
+                </span>
+            </div>
+
+            <div class="hidden md:flex items-center gap-8 font-mono text-sm text-slate-400">
+                <a href="#features" class="hover:text-cyber-neon transition-colors relative group">
+                    <span>// Features</span>
+                    <span class="absolute -bottom-1 left-0 w-0 h-px bg-cyber-neon transition-all group-hover:w-full"></span>
+                </a>
+                <a href="#engine" class="hover:text-cyber-cyan transition-colors relative group">
+                    <span>// Engine</span>
+                    <span class="absolute -bottom-1 left-0 w-0 h-px bg-cyber-cyan transition-all group-hover:w-full"></span>
+                </a>
+                <a href="#" class="hover:text-cyber-purple transition-colors relative group">
+                    <span>// Docs</span>
+                    <span class="absolute -bottom-1 left-0 w-0 h-px bg-cyber-purple transition-all group-hover:w-full"></span>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-4 font-mono text-sm">
+                <a href="#" class="text-slate-400 hover:text-white transition">Login</a>
+                <button class="px-5 py-2 bg-cyber-neon/10 border border-cyber-neon/50 text-cyber-neon rounded font-bold hover:bg-cyber-neon hover:text-cyber-dark transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-neon-green">
+                    Initialize_Graph >_
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="relative z-10">
+
+        <header class="pt-32 pb-24 relative overflow-hidden">
+            <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+                
+                <div>
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel text-xs font-mono text-cyber-neon tracking-wider mb-8 border-cyber-neon/20">
+                        <svg class="w-3 h-3 animate-pulse-slow" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+                        SYSTEM STATUS: V2.0 CORE ONLINE
+                    </div>
+                    
+                    <h1 class="text-5xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
+                        <span class="block text-slate-100">Non-Linear AI for</span>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyber-neon via-cyber-cyan to-cyber-purple animate-pulse-slow">
+                            Complex Thought.
+                        </span>
+                    </h1>
+                    
+                    <p class="text-lg text-slate-400 mb-10 max-w-lg leading-relaxed font-sans">
+                        Stop forcing branching thoughts into linear chat streams. ContextGraph is a spatial interface for LLMs that maps your mind, remembering every fork in the road.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 font-mono">
+                        <button class="px-8 py-4 bg-cyber-neon text-cyber-dark font-bold rounded-md transition-all duration-300 hover:scale-105 shadow-neon-green flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" /></svg>
+                            DEPLOY GRAPH ENGINE
+                        </button>
+                        <button class="px-8 py-4 glass-panel text-slate-300 font-bold rounded-md border-white/10 hover:border-white/30 hover:text-white transition flex items-center justify-center gap-2">
+                            $ READ_MANIFESTO.md
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative h-[500px] flex items-center justify-center perspective-container animate-float lg:mt-0 mt-12">
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-cyber-neon/20 rounded-full blur-[100px] animate-pulse-slow"></div>
+                    
+                    <div class="relative z-10 w-40 h-40 glass-panel rounded-2xl border-cyber-neon/50 flex items-center justify-center shadow-neon-green animate-pulse-slow">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-cyber-neon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                        <div class="absolute inset-[-20px] border border-cyber-cyan/30 rounded-full animate-spin-slow border-dashed"></div>
+                        <div class="absolute inset-[-40px] border border-cyber-purple/20 rounded-full animate-spin-slow animation-delay-2000 border-dotted"></div>
+                    </div>
+                    
+                    <div class="absolute top-[15%] right-[10%] glass-panel px-4 py-2 rounded text-xs font-mono text-cyber-cyan border-cyber-cyan/30 shadow-neon-cyan animate-float animation-delay-1000">
+                        -> Branch: React_Hooks
+                    </div>
+                    <div class="absolute bottom-[20%] left-[5%] glass-panel px-4 py-2 rounded text-xs font-mono text-cyber-purple border-cyber-purple/30 shadow-[0_0_20px_rgba(139,92,246,0.3)] animate-float animation-delay-2000">
+                        <- Context: Backend_API
+                    </div>
+
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 0;">
+                        <path d="M 300 250 L 450 150" stroke="url(#gradient1)" stroke-width="2" stroke-dasharray="4 4" class="opacity-60">
+                             <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
+                        </path>
+                         <path d="M 200 250 L 150 350" stroke="url(#gradient2)" stroke-width="2" stroke-dasharray="4 4" class="opacity-60">
+                             <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" repeatCount="indefinite" />
+                        </path>
+                        <defs>
+                            <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#10B981" />
+                                <stop offset="100%" stop-color="#06B6D4" />
+                            </linearGradient>
+                             <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#10B981" />
+                                <stop offset="100%" stop-color="#8B5CF6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </header>
+
+        <section id="features" class="py-24 relative">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4">
+                        <span class="font-mono text-cyber-neon">// </span> Let Your Mind 
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyber-neon to-cyber-cyan">Branch Out.</span>
+                    </h2>
+                    <p class="text-slate-400 max-w-xl mx-auto font-sans">Traditional chatbots force you into a single lane. ContextGraph lets you explore parallel universes of thought.</p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="glass-panel p-8 rounded-2xl border-white/5 group hover:border-cyber-neon/50 transition-all duration-500 hover:-translate-y-2 relative overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-br from-cyber-neon/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <div class="w-14 h-14 bg-cyber-neon/10 rounded-xl flex items-center justify-center text-cyber-neon mb-6 group-hover:shadow-neon-green transition-shadow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-white font-mono">Quantum Context Flow</h3>
+                        <p class="text-slate-400 leading-relaxed">Context isn't lost; it's inherited. Branch off any message, and the new node instantly understands everything that came before it.</p>
+                    </div>
+                    
+                    <div class="glass-panel p-8 rounded-2xl border-white/5 group hover:border-cyber-cyan/50 transition-all duration-500 hover:-translate-y-2 relative overflow-hidden">
+                         <div class="absolute inset-0 bg-gradient-to-br from-cyber-cyan/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <div class="w-14 h-14 bg-cyber-cyan/10 rounded-xl flex items-center justify-center text-cyber-cyan mb-6 group-hover:shadow-neon-cyan transition-shadow">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-white font-mono">The Spatial Canvas</h3>
+                        <p class="text-slate-400 leading-relaxed">Visualize your conversation history as an interactive map. Zoom out to see the big picture, zoom in to focus on details.</p>
+                    </div>
+
+                    <div class="glass-panel p-8 rounded-2xl border-white/5 group hover:border-cyber-purple/50 transition-all duration-500 hover:-translate-y-2 relative overflow-hidden">
+                         <div class="absolute inset-0 bg-gradient-to-br from-cyber-purple/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        <div class="w-14 h-14 bg-cyber-purple/10 rounded-xl flex items-center justify-center text-cyber-purple mb-6 group-hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-shadow">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 text-white font-mono">Artifact Persistence</h3>
+                        <p class="text-slate-400 leading-relaxed">Your graphs are permanent knowledge bases. Export complex discussions to JSON or Markdown for documentation.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="engine" class="py-24 relative border-t border-white/5 bg-black/40">
+            <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-5 gap-12 items-center">
+                <div class="lg:col-span-2">
+                    <h2 class="text-3xl font-bold mb-6">
+                        Powered by <br>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyber-cyan to-cyber-purple">Model-Agnostic Intelligence.</span>
+                    </h2>
+                    <p class="text-slate-400 mb-8 font-sans leading-relaxed">
+                        ContextGraph is the interface layer; you choose the brain. Switch seamlessly between state-of-the-art models depending on your task's needs.
+                    </p>
+                     <div class="flex items-center gap-4 font-mono text-xs text-slate-500">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-cyber-neon animate-pulse"></div> Low Latency
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-cyber-cyan animate-pulse"></div> Secure API
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-3">
+                    <div class="glass-panel rounded-xl overflow-hidden border-white/10 shadow-2xl">
+                        <div class="h-8 bg-slate-900/80 flex items-center px-4 gap-2 border-b border-white/5">
+                            <div class="w-3 h-3 rounded-full bg-slate-600"></div>
+                            <div class="w-3 h-3 rounded-full bg-slate-600"></div>
+                            <div class="w-3 h-3 rounded-full bg-slate-600"></div>
+                            <span class="ml-4 font-mono text-xs text-slate-500">~/config/models.json</span>
+                        </div>
+                        <div class="p-6 font-mono text-sm text-slate-300 leading-7">
+                            <div><span class="text-cyber-purple">"models"</span>: [</div>
+                            <div class="pl-4">
+                                { <span class="text-cyber-cyan">"id"</span>: <span class="text-cyber-neon">"gpt-4o"</span>, <span class="text-cyber-cyan">"provider"</span>: <span class="text-green-400">"OpenAI"</span> },
+                            </div>
+                            <div class="pl-4">
+                                { <span class="text-cyber-cyan">"id"</span>: <span class="text-cyber-neon">"claude-3.5-sonnet"</span>, <span class="text-cyber-cyan">"provider"</span>: <span class="text-orange-400">"Anthropic"</span> },
+                            </div>
+                             <div class="pl-4 opacity-50">
+                                // More models available...
+                            </div>
+                            <div>]</div>
+                            <div class="mt-4 flex gap-2">
+                                <span class="text-cyber-neon">$</span> cursor <span class="animate-pulse">_</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="py-12 border-t border-white/5 text-center text-slate-500 font-mono text-sm relative z-10 bg-black/60">
+            <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2">
+                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyber-neon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-3.293 3.293l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-3.293-3.293L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                   <span>Built for non-linear minds.</span>
+                </div>
+                <p>&copy; 2024 ContextGraph Labs. <span class="text-cyber-neon">SYSTEM_READY</span></p>
+            </div>
+        </footer>
+
+    </main>
+
+</body>
+</html>

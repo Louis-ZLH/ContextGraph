@@ -16,6 +16,11 @@ func NewRouter(a *app.App) *gin.Engine {
 	api.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
+	
+	NewAuthRouter(api, a)
+	NewUserRouter(api, a)
+	NewCanvasRouter(api, a)
+
 
 	return r
 }

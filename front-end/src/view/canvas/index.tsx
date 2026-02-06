@@ -12,10 +12,13 @@ import {
   useNodesState,
   useEdgesState,
 } from "@xyflow/react";
-import ChatNode from "../../ui/graph/ChatNode";
-import SourceNode from "../../ui/graph/SourceNode";
-import CustomEdge from "../../ui/graph/CustomEdge";
+import ChatNode from "../../ui/canvas/ChatNode";
+import SourceNode from "../../ui/canvas/SourceNode";
+import CustomEdge from "../../ui/canvas/CustomEdge";
 import Dagre from "@dagrejs/dagre";
+import { useSelector } from "react-redux";
+import type { ThemeName } from "../../feature/user/userSlice";
+
 
 const getLayoutedElements = (
   // eslint-disable-next-line
@@ -76,7 +79,7 @@ const initialNodes = [
       icon: "branch",
       inheritedContext: true,
       messages: [
-        { role: "user", content: "那怎么自定义一个带有输入框的 Node？" },
+        { role: "user", content: "那怎么自定义一个带有输入框的 Node?" },
         {
           role: "ai",
           content: [
@@ -150,7 +153,7 @@ export function LayoutFlowInner() {
   const { fitView, getNodes, getEdges } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
+  const theme = useSelector((state: { user: { theme: ThemeName } }) => state.user.theme);
   const onConnect = useCallback(
     //@ts-expect-error connection type
     (connection) => {
@@ -211,15 +214,13 @@ export function LayoutFlowInner() {
           <div className="flex gap-2">
             <button
               onClick={() => onLayout("TB")}
-              className="px-3 py-1.5 rounded-md text-xs font-medium node-card"
-              style={{ color: "var(--text-primary)" }}
+              className={`nopan cursor-pointer px-3 py-1.5 rounded-md text-xs font-medium node-card transition-[filter] ${theme === 'cyber' ? 'hover:brightness-150' : 'hover:brightness-95'}`}
             >
               Vertical
             </button>
             <button
               onClick={() => onLayout("LR")}
-              className="px-3 py-1.5 rounded-md text-xs font-medium node-card"
-              style={{ color: "var(--text-primary)" }}
+              className={`nopan cursor-pointer px-3 py-1.5 rounded-md text-xs font-medium node-card transition-[filter] ${theme === 'cyber' ? 'hover:brightness-150' : 'hover:brightness-95'}`}  
             >
               Horizontal
             </button>
@@ -239,7 +240,7 @@ export function LayoutFlowInner() {
   );
 }
 
-function Graph() {
+function Canvas() {
   return (
     <ReactFlowProvider>
       <LayoutFlowInner />
@@ -249,8 +250,8 @@ function Graph() {
 
 // eslint-disable-next-line
 export async function loader() {
-  console.log("Loading graph with ID");
+  console.log("Loading canvas with ID");
   return null;
 }
 
-export default Graph;
+export default Canvas;

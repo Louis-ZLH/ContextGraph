@@ -1,4 +1,7 @@
 import { Sun, Terminal, ScrollText } from "lucide-react";
+import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import { useLocation } from "react-router";
 
 export type ThemeName = "saas" | "cyber" | "paper";
 
@@ -8,19 +11,34 @@ interface HeaderProps {
 }
 
 export function Header({ theme, onSetTheme }: HeaderProps) {
+  const canvasTitle = useSelector((state: {canvas: {canvasTitle: string}}) => state.canvas.canvasTitle);
+  const location = useLocation();
+  const pathname = location.pathname;
+  const title = useMemo(() => {
+    switch(pathname) {
+      case "/canvas":
+        return "Create Canvas";
+      case "/canvas/search":
+        return "Search Canvases";
+      case "/canvas/myresource":
+        return "My Resources";
+      default:
+        return canvasTitle;
+    }
+  }, [pathname, canvasTitle]);
+
   return (
     <header className="h-14 border-b border-main bg-header flex items-center justify-between px-4 z-10">
       <div className="flex flex-col">
         <div className="flex items-center gap-2 text-secondary text-xs">
           <span>Workspace</span>
           <span className="text-[10px]">&gt;</span>
-          <span>Frontend Learning</span>
         </div>
         <h1
           className="font-semibold leading-tight text-sm"
           style={{ color: "var(--text-primary)" }}
         >
-          React Flow Architecture
+          {title}
         </h1>
       </div>
 
@@ -30,7 +48,7 @@ export function Header({ theme, onSetTheme }: HeaderProps) {
           <button
             onClick={() => onSetTheme("saas")}
             title="SaaS Theme"
-            className="w-7 h-7 flex items-center justify-center rounded transition"
+            className="w-7 h-7 flex items-center justify-center rounded"
             style={{
               backgroundColor:
                 theme === "saas" ? "var(--accent-light)" : "transparent",
@@ -43,7 +61,7 @@ export function Header({ theme, onSetTheme }: HeaderProps) {
           <button
             onClick={() => onSetTheme("cyber")}
             title="Cyber Theme"
-            className="w-7 h-7 flex items-center justify-center rounded transition"
+            className="w-7 h-7 flex items-center justify-center rounded"
             style={{
               backgroundColor:
                 theme === "cyber" ? "var(--accent-light)" : "transparent",
@@ -56,7 +74,7 @@ export function Header({ theme, onSetTheme }: HeaderProps) {
           <button
             onClick={() => onSetTheme("paper")}
             title="Paper Theme"
-            className="w-7 h-7 flex items-center justify-center rounded transition"
+            className="w-7 h-7 flex items-center justify-center rounded"
             style={{
               backgroundColor:
                 theme === "paper" ? "var(--accent-light)" : "transparent",

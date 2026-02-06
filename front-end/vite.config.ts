@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: "/", // 配置基础路径，如果部署在子目录下（如 /app/），请修改此处
   plugins: [react(), tailwindcss()],
   server: {
     // 这里就是代理配置

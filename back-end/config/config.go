@@ -16,12 +16,13 @@ type Config struct {
 	RedisPassword string
 	RedisDB       int
 	MachineID     int64
+	JWTSecret     string
 }
 
 func Load() *Config {
 	// 你也可以换成 viper / envconfig，这里用最朴素的方式
 
-	machine_id , err := strconv.ParseInt(getEnv("MACHINE_ID", "0"), 10, 64)
+	machineID , err := strconv.ParseInt(getEnv("MACHINE_ID", "0"), 10, 64)
 	if err != nil {
 		panic(err)
 	}
@@ -35,10 +36,12 @@ func Load() *Config {
 
 		RedisAddr:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
-		MachineID:     machine_id,
+		JWTSecret:     getEnv("JWT_SECRET", "secret_1103783949"),
+		MachineID:     machineID,
 	}
 
 	cfg.RedisDB = 0
+
 	return cfg
 }
 

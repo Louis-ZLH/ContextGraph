@@ -1,0 +1,235 @@
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router";
+import { KeyRound, Mail, ArrowLeft, ShieldCheck, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { AuthLayout } from "../../ui/auth/AuthLayout";
+import { AuthCard } from "../../ui/auth/AuthCard";
+import { AuthInput } from "../../ui/auth/AuthInput";
+import { AuthButton } from "../../ui/auth/AuthButton";
+import { isValidEmail, isValidPassword } from "../../util/valid";
+import { sendVerificationCode, verifyVerificationCode, resetPassword } from "../../service/auth";
+
+export default function ForgotPasswordPage() {
+  const [step, setStep] = useState<1 | 2>(1);
+  const navigate = useNavigate();
+
+  // Step 1: Email Verification
+  const [email, setEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // Step 2: New Password
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // Handle cooldown timer
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  const handleSendCode = async () => {
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    if(!isValidEmail(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    
+    setIsSendingCode(true);
+    const result = await sendVerificationCode(email, "reset_password");
+    
+    if(result.success) {
+      toast.success(result.message);
+      setIsSendingCode(false);
+      setCooldown(60);
+    } else {
+      toast.error(result.message);
+      setIsSendingCode(false);
+      setCooldown(3);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verificationCode || verificationCode.length !== 6) {
+       toast.error("Please enter a valid verification code");
+       return;
+    }
+
+    setIsVerifying(true);
+    // Verify code first to allow user to proceed
+    const result = await verifyVerificationCode(email, verificationCode, "reset_password");
+    
+    if(!result.success) {
+      toast.error(result.message);
+      setIsVerifying(false);
+      return;
+    }
+    
+    setIsVerifying(false);
+    setCooldown(0);
+    toast.success(result.message);
+    setStep(2);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || !confirmPassword) {
+        toast.error("Please fill in all fields");
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        toast.error("Passwords do not match");
+        return;
+    }
+
+    const passwordValidation = isValidPassword(password);
+    if (!passwordValidation.isValid) {
+        toast.error(passwordValidation.message || "Invalid password");
+        return;
+    }
+
+    setIsResetting(true);
+    // Pass email, password AND code to resetPassword
+    const result = await resetPassword(email, password, verificationCode);
+    
+    if(!result.success) {
+      toast.error(result.message);
+      setIsResetting(false);
+      return;
+    }
+    
+    setIsResetting(false);
+    toast.success(result.message);
+    navigate("/canvas");
+  };
+
+  return (
+    <AuthLayout>
+      <AuthCard
+        title="Recovery Protocol"
+        subtitle={step === 1 ? "Enter identity to reset access key." : "Set new access key."}
+        icon={KeyRound}
+      >
+        {step === 1 ? (
+          /* STEP 1: Email & Code */
+          <form onSubmit={handleVerify} className="space-y-6">
+             <div className="space-y-4">
+               <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <AuthInput
+                        label="Identity / Email"
+                        icon={Mail}
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="user@contextcanvas.ai"
+                        required
+                        disabled={cooldown > 0 && cooldown < 61 || isSendingCode}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={isSendingCode || cooldown > 0 || !email}
+                    className="h-[46px] px-4 mb-px bg-slate-800 border border-white/10 hover:border-cyber-neon/50 text-cyber-neon text-xs font-mono rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isSendingCode ? "Sending..." : cooldown > 0 ? `${cooldown}s` : "Send Code"}
+                  </button>
+               </div>
+
+               <AuthInput
+                  label="Verification Code"
+                  icon={ShieldCheck}
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  placeholder="######"
+                  required
+               />
+            </div>
+
+            <AuthButton isLoading={isVerifying} loadingText="Verifying...">
+              Verify & Continue
+            </AuthButton>
+          </form>
+        ) : (
+          /* STEP 2: New Password */
+          <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-3 text-sm text-emerald-400 mb-6">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Identity verified: {email}</span>
+             </div>
+
+            <AuthInput
+              label="New Passcode"
+              icon={Lock}
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              autoFocus
+              endAdornment={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="focus:outline-none flex items-center justify-center p-1"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                  )}
+                </button>
+              }
+            />
+
+            <AuthInput
+              label="Confirm Passcode"
+              icon={Lock}
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+
+            <div className="flex gap-3">
+               <button 
+                type="button" 
+                onClick={() => setStep(1)}
+                className="px-4 py-3 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors font-mono text-sm"
+               >
+                 Back
+               </button>
+               <AuthButton isLoading={isResetting} loadingText="Resetting...">
+                 Reset Access Key
+               </AuthButton>
+            </div>
+          </form>
+        )}
+
+        <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
+          <Link
+            to="/login"
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Back to Access Terminal
+          </Link>
+        </div>
+      </AuthCard>
+    </AuthLayout>
+  );
+}
