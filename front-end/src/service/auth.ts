@@ -1,12 +1,7 @@
 import type { User } from "./type";
 import { apiRequest } from "../util/api";
 import { toCamelCase } from "../util/transform";
-
-interface JSONResponse {
-    code: number;
-    message: string;
-    data?: Record<string, unknown>;
-}
+import type { JSONResponse } from "./type";
 
 export async function sendVerificationCode(email: string, type: "register" | "reset_password"): Promise<{ success: boolean, message: string }> {
     try{

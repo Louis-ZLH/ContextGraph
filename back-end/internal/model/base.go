@@ -15,7 +15,6 @@ type BaseModel struct {
 }
 
 func (b *BaseModel) BeforeCreate(tx *gorm.DB) (err error) {
-	// 如果 ID 还没被赋值（为0），就生成一个新的
 	if b.ID == 0 {
 		b.ID = idgen.GenID()
 	}

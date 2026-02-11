@@ -2,6 +2,14 @@
 // 如果没有配置，默认使用空字符串（即当前域名）
 const BASE_URL = import.meta.env.API_BASE_URL || "";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 /**
  * 封装后的 fetch 请求
  * 自动拼接 BASE_URL
@@ -32,7 +40,7 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || `HTTP error! status: ${response.status}`);
+    throw new ApiError(errorBody.message || `HTTP error! status: ${response.status}`, response.status);
   }
 
   return response.json();

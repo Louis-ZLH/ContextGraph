@@ -48,6 +48,7 @@ const (
 	// 资源相关 4000-4999
 	BizNotFound   = 4000
 	BizForbidden  = 4001
+	BizConflict   = 4002
 )
 
 // ==================== 构造函数 ====================
@@ -92,6 +93,10 @@ func Forbidden(message string) *AppError {
 
 func PartialSuccess(message string) *AppError {
 	return New(http.StatusOK, BizPartialSuccess, message)
+}
+
+func Conflict(message string) *AppError {
+	return New(http.StatusConflict, BizConflict, message)
 }
 
 // 认证相关

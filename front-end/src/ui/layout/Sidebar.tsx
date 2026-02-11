@@ -6,7 +6,6 @@ import {
   Network,
   PanelLeftClose,
   PanelLeftOpen,
-  FileText,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import type { User } from "../../service/type";
@@ -14,28 +13,32 @@ import { useState } from "react";
 import { useSelector } from "react-redux";
 import type { ThemeName } from "../../feature/user/userSlice";
 import { UserModal } from "./UserModal";
+import { canvasListQueryOptions } from "../../query/canvas";
+import { useQuery } from "@tanstack/react-query";
+import type { Canvas } from "../../service/type";
+import { SidebarCanvasItem } from "./SidebarCanvasItem";
 
 // 模拟的 canvases 数据（后续会从后端获取）
-const mockCanvases = [
-  { id: "1", title: "AI Research Notes" },
-  { id: "2", title: "Product Roadmap 2026" },
-  { id: "3", title: "AI Research Notes" },
-  { id: "4", title: "Product Roadmap 2026" },
-  { id: "5", title: "AI Research Notes" },
-  { id: "6", title: "Product Roadmap 2026" },
-  { id: "7", title: "AI Research Notes" },
-  { id: "8", title: "Product Roadmap 2026" },
-  { id: "9", title: "AI Research Notes" },
-  { id: "10", title: "Product Roadmap 2026" },
-  { id: "11", title: "AI Research Notes" },
-  { id: "12", title: "Product Roadmap 2026" },
-  { id: "13", title: "AI Research Notes" },
-  { id: "14", title: "Product Roadmap 2026" },
-  { id: "15", title: "AI Research Notes" },
-  { id: "16", title: "Product Roadmap 2026" },
-  { id: "17", title: "AI Research Notes" },
-  { id: "18", title: "Product Roadmap 2026" },
-];
+// const mockCanvases = [
+//   { id: "1", title: "AI Research Notes" },
+//   { id: "2", title: "Product Roadmap 2026" },
+//   { id: "3", title: "AI Research Notes" },
+//   { id: "4", title: "Product Roadmap 2026" },
+//   { id: "5", title: "AI Research Notes" },
+//   { id: "6", title: "Product Roadmap 2026" },
+//   { id: "7", title: "AI Research Notes" },
+//   { id: "8", title: "Product Roadmap 2026" },
+//   { id: "9", title: "AI Research Notes" },
+//   { id: "10", title: "Product Roadmap 2026" },
+//   { id: "11", title: "AI Research Notes" },
+//   { id: "12", title: "Product Roadmap 2026" },
+//   { id: "13", title: "AI Research Notes" },
+//   { id: "14", title: "Product Roadmap 2026" },
+//   { id: "15", title: "AI Research Notes" },
+//   { id: "16", title: "Product Roadmap 2026" },
+//   { id: "17", title: "AI Research Notes" },
+//   { id: "18", title: "Product Roadmap 2026" },
+// ];
 
 export function Sidebar({ user }: { user: User | null }) {
   const [isOpen, setIsOpen] = useState(true);
@@ -44,6 +47,8 @@ export function Sidebar({ user }: { user: User | null }) {
     (state: { user: { theme: ThemeName } }) => state.user.theme
   );
   const location = useLocation();
+  const { data } = useQuery(canvasListQueryOptions);
+  const canvasList = data?.data?.canvasList as Canvas[] | undefined;
 
   return (
     <aside
@@ -65,6 +70,18 @@ export function Sidebar({ user }: { user: User | null }) {
             <PanelLeftOpen size={24} strokeWidth={1.25} />
           </button>
         </div>
+
+        {/* New Canvas Button (Collapsed) */}
+        <div className="flex justify-center mt-2">
+          <Link
+            to="/canvas"
+            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            title="New Canvas"
+          >
+            <Plus size={24} strokeWidth={1.25} />
+          </Link>
+        </div>
+        
         <div className="flex-1" />
         <div className="p-4 flex justify-center">
           <button
@@ -112,9 +129,9 @@ export function Sidebar({ user }: { user: User | null }) {
         </div>
 
         {/* Nav */}
-        <div className={`flex-1 overflow-y-auto pb-4 space-y-6 ${isOpen ? "px-0" : "px-3"} ${theme === "cyber" ? "CyberScroller" : "ModernScroller"}`}>
+        <div className={`flex-1 overflow-y-auto pb-4 space-y-6 ${theme === "cyber" ? "CyberScroller" : "ModernScroller"}`}>
           {/* Actions Section */}
-          <div className="space-y-1 sticky top-0 bg-sidebar pt-4 z-10 shadow-sm">
+          <div className="space-y-1 sticky top-0 bg-sidebar pt-4 z-20 shadow-sm">
             <Link
               to="/canvas"
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
@@ -155,26 +172,13 @@ export function Sidebar({ user }: { user: User | null }) {
               Canvases
             </div>
             <div className="space-y-1">
-              {mockCanvases.map((canvas) => (
-                <Link
+              {canvasList?.map((canvas: Canvas) => (
+                <SidebarCanvasItem
                   key={canvas.id}
-                  to={`/canvas/${canvas.id}`}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 group ${
-                    location.pathname === `/canvas/${canvas.id}`
-                      ? "bg-accent/15 text-accent"
-                      : `text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`
-                  }`}
-                >
-                  <FileText
-                    size={16}
-                    className={
-                      location.pathname === `/canvas/${canvas.id}`
-                        ? "text-accent"
-                        : "text-secondary group-hover:text-accent"
-                    }
-                  />
-                  <span className="text-sm truncate">{canvas.title}</span>
-                </Link>
+                  canvas={canvas}
+                  theme={theme}
+                  isActive={location.pathname === `/canvas/${canvas.id}`}
+                />
               ))}
             </div>
           </div>

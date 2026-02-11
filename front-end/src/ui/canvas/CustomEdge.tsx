@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
-  useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
 import { Trash2 } from "lucide-react";
+import { useDispatch } from "react-redux";
+import { onDisconnect } from "../../feature/canvas/canvasSlice";
 
 
 export default function CustomEdge({
@@ -19,9 +20,13 @@ export default function CustomEdge({
   targetPosition,
   data,
 }: EdgeProps) {
-  const { deleteElements } = useReactFlow();
   const isDashed = data?.dashed === true;
   const [hovered, setHovered] = useState(false);
+  const dispatch = useDispatch();
+
+  const onDelete = useCallback(() => {
+    dispatch(onDisconnect(id));
+  }, [dispatch, id]);
 
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
@@ -62,7 +67,7 @@ export default function CustomEdge({
       />
       <EdgeLabelRenderer>
         <button
-          onClick={() => deleteElements({ edges: [{ id }] })}
+          onClick={onDelete}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           style={{

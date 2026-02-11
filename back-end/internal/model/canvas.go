@@ -6,6 +6,7 @@ type Canvas struct {
 	BaseModel
 	UserID    int64          `gorm:"index" json:"user_id,string"` // 加索引
 	Title     string         `gorm:"type:varchar(100)" json:"title"`
+	Version   int64          `gorm:"default:1;not null" json:"version"` // 乐观锁版本号
 }
 
 func (c *Canvas) TableName() string {

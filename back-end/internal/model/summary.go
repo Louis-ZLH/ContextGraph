@@ -19,3 +19,4 @@ type Summary struct {
 func (s *Summary) TableName() string {
 	return "summaries"
 }
+

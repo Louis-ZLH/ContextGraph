@@ -16,3 +16,4 @@ type TokenUsageLog struct {
 func (t *TokenUsageLog) TableName() string {
 	return "token_usage_logs"
 }
+

@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function Header({ theme, onSetTheme }: HeaderProps) {
-  const canvasTitle = useSelector((state: {canvas: {canvasTitle: string}}) => state.canvas.canvasTitle);
+  const canvasTitle = useSelector((state: {canvas: {title: string}}) => state.canvas.title);
   const location = useLocation();
   const pathname = location.pathname;
   const title = useMemo(() => {

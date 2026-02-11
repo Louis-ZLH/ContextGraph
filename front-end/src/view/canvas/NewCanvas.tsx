@@ -1,6 +1,33 @@
-import { Plus, LayoutTemplate, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, LayoutTemplate, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { createCanvas as createCanvasService } from "../../service/canvas";
+import { useNavigate } from "react-router";
+import { toast } from "react-hot-toast";
+import { queryClient } from "../../query";
 
 export default function NewCanvas() {
+  const navigate = useNavigate();
+  const { mutate: createCanvas, isPending } = useMutation({
+    mutationFn: createCanvasService,
+    onSuccess: (data) => {
+      if(data.success && data.data) {
+        navigate(`/canvas/${data.data?.id}`);
+        queryClient.invalidateQueries({ queryKey: ["canvas", "list"] });
+      }
+    },
+    onError: (error) => {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to create canvas");
+      }
+    }
+  });
+
+  const handleCreateBlankCanvas = () => {
+    createCanvas();
+  };
+
   return (
     <div className="w-full h-full bg-canvas flex flex-col items-center justify-center p-6 animate-fade-in">
       <div className="max-w-4xl w-full space-y-12">
@@ -20,13 +47,27 @@ export default function NewCanvas() {
         {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
           {/* Create Empty Card */}
-          <button className="group relative flex flex-col items-start p-8 h-80 rounded-3xl border-2 border-dashed border-main hover:border-accent bg-node-bg/50 hover:bg-node-bg transition-[transform,box-shadow,border-color,background-color] duration-300 cursor-pointer text-left hover:-translate-y-1 hover:shadow-xl">
-            <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-300 transform translate-x-2 group-hover:translate-x-0">
-              <ArrowRight className="w-6 h-6 text-accent" />
-            </div>
+          <button 
+            onClick={handleCreateBlankCanvas} 
+            disabled={isPending}
+            className={`group relative flex flex-col items-start p-8 h-80 rounded-3xl border-2 border-dashed border-main bg-node-bg/50 transition-[transform,box-shadow,background-color,border-color] duration-300 text-left ${
+              isPending 
+                ? "cursor-not-allowed opacity-70" 
+                : "hover:border-accent hover:bg-node-bg cursor-pointer hover:-translate-y-1 hover:shadow-xl"
+            }`}
+          >
+            {!isPending && (
+              <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-300 transform translate-x-2 group-hover:translate-x-0">
+                <ArrowRight className="w-6 h-6 text-accent" />
+              </div>
+            )}
 
             <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mb-auto group-hover:scale-110 transition-transform duration-300">
-              <Plus className="w-8 h-8 text-accent" />
+              {isPending ? (
+                <Loader2 className="w-8 h-8 text-accent animate-spin" />
+              ) : (
+                <Plus className="w-8 h-8 text-accent" />
+              )}
             </div>
 
             <div className="space-y-2 mt-auto">
@@ -42,10 +83,21 @@ export default function NewCanvas() {
           </button>
 
           {/* Templates Card */}
-          <button className="group relative flex flex-col items-start p-8 h-80 rounded-3xl border border-main hover:border-accent bg-node-bg shadow-sm hover:shadow-xl transition-[transform,box-shadow,border-color,background-color] duration-300 cursor-pointer text-left hover:-translate-y-1">
-            <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-300 transform translate-x-2 group-hover:translate-x-0">
-              <ArrowRight className="w-6 h-6 text-accent" />
-            </div>
+          {/*TODO: Implement template creation */}
+          <button 
+            onClick={handleCreateBlankCanvas} 
+            disabled={isPending}
+            className={`group relative flex flex-col items-start p-8 h-80 rounded-3xl border border-main bg-node-bg shadow-sm transition-[transform,box-shadow,background-color,border-color] duration-300 text-left ${
+              isPending 
+                ? "cursor-not-allowed opacity-70" 
+                : "hover:border-accent hover:shadow-xl cursor-pointer hover:-translate-y-1"
+            }`}
+          >
+            {!isPending && (
+              <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-300 transform translate-x-2 group-hover:translate-x-0">
+                <ArrowRight className="w-6 h-6 text-accent" />
+              </div>
+            )}
 
             <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mb-auto group-hover:scale-110 transition-transform duration-300">
               <LayoutTemplate className="w-8 h-8 text-primary group-hover:text-accent transition-colors" />

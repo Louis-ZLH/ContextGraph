@@ -363,3 +363,54 @@ body {
 .CyberScroller::-webkit-scrollbar-thumb:hover {
   background-color: #64748b; /* Slate-500: Lighter on hover */
 }
+
+/* ============ React Flow Controls & MiniMap Theme Adaptation ============ */
+
+/* Controls Container */
+.react-flow__controls {
+  box-shadow: var(--node-shadow);
+  border: 1px solid var(--border-main);
+  background-color: var(--node-bg);
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* Controls Buttons */
+.react-flow__controls-button {
+  background-color: var(--node-bg);
+  border-bottom: 1px solid var(--border-main);
+  color: var(--text-primary);
+  fill: var(--text-primary);
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--bg-canvas);
+}
+
+.react-flow__controls-button svg {
+  fill: var(--text-primary);
+}
+
+/* MiniMap Container */
+.react-flow__minimap {
+  background-color: var(--node-bg);
+  border: 1px solid var(--border-main);
+  box-shadow: var(--node-shadow);
+  border-radius: 4px;
+}
+
+/* MiniMap Mask */
+.react-flow__minimap-mask {
+  fill: var(--bg-canvas);
+  opacity: 0.7;
+}
+
+/* MiniMap Nodes */
+.react-flow__minimap-node {
+  fill: var(--border-main);
+  stroke: none;
+}

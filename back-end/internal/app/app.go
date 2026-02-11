@@ -13,14 +13,16 @@ import (
 	"github.com/luhao/contextGraph/internal/service"
 	"github.com/luhao/contextGraph/pkg/idgen"
 	"github.com/luhao/contextGraph/pkg/utils"
+	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 type App struct {
-	Cfg *config.Config
-	DB  *gorm.DB
-	RDB *redis.Client
+	Cfg   *config.Config
+	DB    *gorm.DB
+	RDB   *redis.Client
+	Minio *minio.Client
 
 	H *Handlers
 }
@@ -42,9 +44,29 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// 3. migrate
+	// 3. MinIO
+	minioClient, err := infra.NewMinio(infra.MinioConfig{
+		Endpoint:  cfg.MinioEndpoint,
+		AccessKey: cfg.MinioAccessKey,
+		SecretKey: cfg.MinioSecretKey,
+		UseSSL:    cfg.MinioUseSSL,
+		Bucket:    cfg.MinioBucket,
+	})
+	if err != nil {
+		if rdb != nil {
+			_ = rdb.Close()
+		}
+		if sqlDB, e := db.DB(); e == nil {
+			_ = sqlDB.Close()
+		}
+		return nil, err
+	}
+
+	// 4. migrate
 	if err := migrate.AutoMigrate(db); err != nil {
-		if rdb != nil { _ = rdb.Close() }
+		if rdb != nil {
+			_ = rdb.Close()
+		}
 		if sqlDB, e := db.DB(); e == nil {
 			_ = sqlDB.Close()
 		}
@@ -64,10 +86,11 @@ func New(cfg *config.Config) (*App, error) {
 
 
 	return &App{
-		Cfg: cfg,
-		DB:  db,
-		RDB: rdb,
-		H:   wireHandlers(db, rdb),
+		Cfg:   cfg,
+		DB:    db,
+		RDB:   rdb,
+		Minio: minioClient,
+		H:     wireHandlers(db, rdb, minioClient, cfg),
 	}, nil
 }
 
@@ -91,7 +114,10 @@ type Handlers struct {
 	CanvasHandler *handler.CanvasHandler
 }
 
-func wireHandlers(db *gorm.DB, rdb *redis.Client) *Handlers {
+func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, cfg *config.Config) *Handlers {
+	// MinIO client 和 config 预留给后续 upload handler 使用
+	_ = minioClient
+	_ = cfg
 	// Auth
 	userRepo := repo.NewUserRepo(db, rdb)
 	authService := service.NewAuthService(userRepo)
