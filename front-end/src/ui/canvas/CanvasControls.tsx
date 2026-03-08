@@ -1,4 +1,4 @@
-import { type DragEvent, useCallback, useRef } from "react";
+import { type DragEvent, useCallback, useRef, memo } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -16,7 +16,7 @@ interface CanvasControlsProps {
   theme: ThemeName;
 }
 
-export function CanvasControls({ onLayout, onAddNode, onUploadFile, theme }: CanvasControlsProps) {
+export const CanvasControls = memo(function CanvasControls({ onLayout, onAddNode, onUploadFile, theme }: CanvasControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onDragStart = useCallback(
@@ -124,4 +124,4 @@ export function CanvasControls({ onLayout, onAddNode, onUploadFile, theme }: Can
       />
     </>
   );
-}
+});

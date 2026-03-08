@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction, nanoid } from "@reduxjs/toolkit";
+import { createSlice, createSelector, type PayloadAction, nanoid } from "@reduxjs/toolkit";
 import { applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Connection } from "@xyflow/react";
 import type { Node, Edge, Command, CanvasState, AtomicOp } from "./types";
 import { emptyDelta, applyCommand, applyOps, mergeOpsToDelta } from "./canvasOps";
@@ -335,3 +335,54 @@ export const {
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
+
+// ────────────── Selectors ──────────────
+
+const selectNodes = (state: { canvas: CanvasState }) => state.canvas.nodes;
+const selectEdges = (state: { canvas: CanvasState }) => state.canvas.edges;
+const selectMaximizedNodeId = (state: { canvas: CanvasState }) => state.canvas.maximizedNodeId;
+
+/** Stable empty reference — avoids new object allocation when no node is maximized */
+const EMPTY_PARENTS: { chatParents: Node[]; resourceParents: Node[] } = {
+  chatParents: [],
+  resourceParents: [],
+};
+
+/** Compare parent sets by id + essential data to skip re-renders when only positions changed */
+function parentResultEqual(
+  a: { chatParents: Node[]; resourceParents: Node[] },
+  b: { chatParents: Node[]; resourceParents: Node[] },
+): boolean {
+  if (a === b) return true;
+  if (a.chatParents.length !== b.chatParents.length) return false;
+  if (a.resourceParents.length !== b.resourceParents.length) return false;
+  for (let i = 0; i < a.chatParents.length; i++) {
+    if (a.chatParents[i].id !== b.chatParents[i].id) return false;
+  }
+  for (let i = 0; i < a.resourceParents.length; i++) {
+    const na = a.resourceParents[i], nb = b.resourceParents[i];
+    if (na.id !== nb.id || na.data?.fileId !== nb.data?.fileId) return false;
+  }
+  return true;
+}
+
+/** Returns parent nodes (nodes whose edge targets the maximized node), split by type */
+export const selectParentNodesOfMaximized = createSelector(
+  [selectNodes, selectEdges, selectMaximizedNodeId],
+  (nodes, edges, maximizedNodeId) => {
+    if (!maximizedNodeId) return EMPTY_PARENTS;
+    const parents = edges
+      .filter((e) => e.target === maximizedNodeId)
+      .map((e) => nodes.find((n) => n.id === e.source))
+      .filter((n): n is Node => n !== undefined);
+    return {
+      chatParents: parents.filter((n) => n.type === "chatNode"),
+      resourceParents: parents.filter((n) => n.type === "resourceNode"),
+    };
+  },
+  {
+    memoizeOptions: {
+      resultEqualityCheck: parentResultEqual,
+    },
+  },
+);

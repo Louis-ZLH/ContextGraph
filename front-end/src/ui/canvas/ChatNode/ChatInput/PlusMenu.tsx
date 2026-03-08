@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Plus, Upload, Search, BookOpen } from "lucide-react";
 
 const modeItems = [
@@ -103,4 +103,4 @@ function PlusMenu({ position, expandUp = true, onSelectMode, onUploadFile }: { p
   );
 }
 
-export default PlusMenu;
+export default memo(PlusMenu);

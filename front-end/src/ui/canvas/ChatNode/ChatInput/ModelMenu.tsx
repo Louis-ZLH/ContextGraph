@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { ChevronDown } from "lucide-react";
 
 function ModelMenu({
@@ -75,4 +75,4 @@ function ModelMenu({
   );
 }
 
-export default ModelMenu;
+export default memo(ModelMenu);

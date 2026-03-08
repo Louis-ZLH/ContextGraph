@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  memo,
 } from "react";
 import type { ThemeName } from "../../../../feature/user/userSlice";
 import MessageItem from "./MessageItem";
@@ -173,4 +174,4 @@ function MessageList({
   );
 }
 
-export default MessageList;
+export default memo(MessageList);

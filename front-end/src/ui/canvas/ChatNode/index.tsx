@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from "react";
 import { Handle, Position, useReactFlow, type Viewport } from "@xyflow/react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector, useDispatch, useStore } from "react-redux";
 import type { ThemeName } from "../../../feature/user/userSlice";
 import { deleteNode, toggleShowControls, setMaximizedNode, addNodeWithEdge, patchNodeData } from "../../../feature/canvas/canvasSlice";
 import { nanoid } from "@reduxjs/toolkit";
@@ -47,29 +47,27 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
   const threadIds = useSelector((state: RootState) => selectCurrentThreadIdsByConversationId(state, id), shallowEqual);
 
   const { fitView, getViewport, setViewport } = useReactFlow();
+  const store = useStore<RootState>();
   const [inputValue, setInputValue] = useState("");
   const theme = useSelector(
     (state: { user: { theme: ThemeName } }) => state.user.theme,
   );
-  const showControls = useSelector(
-    (state: { canvas: { showControls: boolean } }) => state.canvas.showControls,
+  const isMaximized = useSelector(
+    (state: { canvas: { maximizedNodeId: string | null } }) => state.canvas.maximizedNodeId === id,
   );
-  const maximizedNodeId = useSelector(
-    (state: { canvas: { maximizedNodeId: string | null } }) => state.canvas.maximizedNodeId,
-  );
-  const isMaximized = maximizedNodeId === id;
   const viewportState = useRef<{ x: number; y: number; zoom: number } | null>(
     null,
   );
   const label = title ?? "New Chat";
 
+  // cleanup: 组件卸载时如果 showControls 为 false 则恢复。用 store 惰性读取，不订阅。
   useEffect(() => {
     return () => {
-      if (showControls === false) {
+      if (!store.getState().canvas.showControls) {
         dispatch(toggleShowControls(true));
       }
     };
-  }, [showControls, dispatch]);
+  }, [store, dispatch]);
 
   const handleSizeChange = useCallback(() => {
     dispatch(toggleShowControls());
@@ -93,10 +91,9 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
     }
   }, [isMaximized, dispatch, fitView, getViewport, setViewport, id]);
 
-  const nodePosition = useSelector(
-    (state: RootState) => state.canvas.nodes.find((n) => n.id === id)?.position,
-  );
-  const canvasId = useSelector((state: RootState) => state.canvas.canvasId);
+  const handleDelete = useCallback(() => {
+    dispatch(deleteNode(id));
+  }, [dispatch, id]);
 
   const handleUploadFile = useCallback(
     (files: File[]) => {
@@ -109,6 +106,10 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
       if (otherRejected > 0) {
         toast.error(`${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
       }
+      // 惰性读取：只在用户上传时才取最新值，不订阅 nodes 变化
+      const state = store.getState();
+      const nodePosition = state.canvas.nodes.find((n) => n.id === id)?.position;
+      const canvasId = state.canvas.canvasId;
       if (accepted.length === 0 || !nodePosition || !canvasId) return;
 
       // ChatNode: w-[400px], ResourceNode: w-[230px]
@@ -155,7 +156,7 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
         })();
       }
     },
-    [dispatch, nodePosition, canvasId, id],
+    [dispatch, store, id],
   );
 
   const isEmpty = threadIds.length === 0;
@@ -178,7 +179,7 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
             label={label}
             isMaximized={isMaximized}
             onSizeChange={handleSizeChange}
-            onDelete={() => dispatch(deleteNode(id))}
+            onDelete={handleDelete}
           />
 
           <div className="nodrag nopan nowheel cursor-default flex flex-col flex-1 min-h-0 relative">

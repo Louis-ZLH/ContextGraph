@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useContext } from "react";
+import { useState, useRef, useCallback, useEffect, useContext, memo } from "react";
 import { X, Loader2 } from "lucide-react";
 import PlusMenu from "./PlusMenu";
 import ModelMenu from "./ModelMenu";
@@ -247,4 +247,4 @@ function ChatInput({
   );
 }
 
-export default ChatInput;
+export default memo(ChatInput);

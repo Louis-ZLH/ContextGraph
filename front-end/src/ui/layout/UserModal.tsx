@@ -1,7 +1,8 @@
-import { X, User as UserIcon, LogOut, CreditCard, Bell, Shield, Palette } from "lucide-react";
-import { useEffect, useCallback } from "react";
+import { X, User as UserIcon, LogOut, CreditCard, Bell, Shield, Palette, Sun, Terminal, ScrollText, Check } from "lucide-react";
+import { useEffect, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { changeTheme } from "../../feature/user/userSlice";
 import type { ThemeName } from "../../feature/user/userSlice";
 import type { User } from "../../service/type";
 import { logoutUser } from "../../service/auth";
@@ -20,7 +21,15 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
   const theme = useSelector(
     (state: { user: { theme: ThemeName } }) => state.user.theme
   );
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  const themes: { name: ThemeName; label: string; icon: typeof Sun; accent: string; bg: string; preview: string }[] = [
+    { name: "saas", label: "SaaS", icon: Sun, accent: "blue", bg: "bg-white", preview: "Light & professional" },
+    { name: "cyber", label: "Cyber", icon: Terminal, accent: "emerald", bg: "bg-slate-900", preview: "Dark & techy" },
+    { name: "paper", label: "Paper", icon: ScrollText, accent: "orange", bg: "bg-[#fdfbf7]", preview: "Warm & minimal" },
+  ];
   // ESC 键关闭
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -163,46 +172,100 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
         {/* 菜单项 */}
         <div className="p-4 space-y-1">
           {menuItems.map((item) => (
-            <button
-              key={item.label}
-              className={`w-full flex items-center gap-4 p-3 rounded-xl transition-colors cursor-pointer text-left ${
-                theme === "cyber"
-                  ? "hover:bg-white/5"
-                  : theme === "paper"
-                    ? "hover:bg-stone-100"
-                    : "hover:bg-gray-50"
-              }`}
-            >
-              <div
-                className={`p-2 rounded-lg ${
+            <div key={item.label}>
+              <button
+                onClick={item.label === "Appearance" ? () => setShowThemePicker((v) => !v) : undefined}
+                className={`w-full flex items-center gap-4 p-3 rounded-xl transition-colors cursor-pointer text-left ${
                   theme === "cyber"
-                    ? "bg-emerald-500/10"
+                    ? "hover:bg-white/5"
                     : theme === "paper"
-                      ? "bg-orange-100"
-                      : "bg-blue-50"
+                      ? "hover:bg-stone-100"
+                      : "hover:bg-gray-50"
                 }`}
               >
-                <item.icon
-                  size={18}
-                  className={
+                <div
+                  className={`p-2 rounded-lg ${
                     theme === "cyber"
-                      ? "text-emerald-400"
+                      ? "bg-emerald-500/10"
                       : theme === "paper"
-                        ? "text-orange-500"
-                        : "text-blue-500"
-                  }
-                />
-              </div>
-              <div>
-                <p
-                  className="font-medium text-sm"
-                  style={{ color: "var(--text-primary)" }}
+                        ? "bg-orange-100"
+                        : "bg-blue-50"
+                  }`}
                 >
-                  {item.label}
-                </p>
-                <p className="text-xs text-secondary">{item.description}</p>
-              </div>
-            </button>
+                  <item.icon
+                    size={18}
+                    className={
+                      theme === "cyber"
+                        ? "text-emerald-400"
+                        : theme === "paper"
+                          ? "text-orange-500"
+                          : "text-blue-500"
+                    }
+                  />
+                </div>
+                <div className="flex-1">
+                  <p
+                    className="font-medium text-sm"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {item.label}
+                  </p>
+                  <p className="text-xs text-secondary">{item.description}</p>
+                </div>
+              </button>
+
+              {/* Theme Picker - 展开在 Appearance 下方 */}
+              {item.label === "Appearance" && showThemePicker && (
+                <div className="px-3 pb-2 pt-1">
+                  <div className="grid grid-cols-3 gap-2">
+                    {themes.map((t) => {
+                      const isActive = theme === t.name;
+                      return (
+                        <button
+                          key={t.name}
+                          onClick={() => dispatch(changeTheme(t.name))}
+                          className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                            isActive
+                              ? theme === "cyber"
+                                ? "border-emerald-500 bg-emerald-500/10"
+                                : theme === "paper"
+                                  ? "border-orange-500 bg-orange-50"
+                                  : "border-blue-500 bg-blue-50"
+                              : theme === "cyber"
+                                ? "border-slate-700 hover:border-slate-500"
+                                : theme === "paper"
+                                  ? "border-stone-200 hover:border-stone-400"
+                                  : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          {isActive && (
+                            <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center ${
+                              theme === "cyber" ? "bg-emerald-500" : theme === "paper" ? "bg-orange-500" : "bg-blue-500"
+                            }`}>
+                              <Check size={10} className="text-white" />
+                            </div>
+                          )}
+                          {/* 主题色块预览 */}
+                          <div className={`w-8 h-8 rounded-lg ${t.bg} border ${
+                            t.name === "cyber" ? "border-slate-600" : t.name === "paper" ? "border-stone-300" : "border-gray-200"
+                          }`}>
+                            <t.icon size={16} className={`m-auto mt-1.5 ${
+                              t.name === "cyber" ? "text-emerald-400" : t.name === "paper" ? "text-orange-500" : "text-blue-500"
+                            }`} />
+                          </div>
+                          <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                            {t.label}
+                          </span>
+                          <span className="text-[10px] text-secondary leading-tight text-center">
+                            {t.preview}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </div>
 

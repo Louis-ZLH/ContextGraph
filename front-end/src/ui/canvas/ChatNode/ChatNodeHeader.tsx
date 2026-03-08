@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Sparkles, Maximize2, Minimize2, X } from "lucide-react";
 
 interface ChatNodeHeaderProps {
@@ -70,4 +71,4 @@ function ChatNodeHeader({
   );
 }
 
-export default ChatNodeHeader;
+export default memo(ChatNodeHeader);

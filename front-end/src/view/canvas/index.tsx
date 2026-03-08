@@ -45,6 +45,9 @@ const edgeTypes = {
   "custom-edge": CustomEdge,
 };
 
+const HIDDEN_STYLE: React.CSSProperties = { visibility: 'hidden', pointerEvents: 'none' };
+const DELETE_KEYS = ["Backspace", "Delete"];
+
 export function LayoutFlowInner() {
   useSyncCanvas();
   const dispatch = useDispatch();
@@ -478,14 +481,16 @@ export function LayoutFlowInner() {
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onDelete={onDelete}
-        deleteKeyCode={showControls ? ["Backspace", "Delete"] : null}
+        deleteKeyCode={showControls ? DELETE_KEYS : null}
         onDragOver={onDragOver}
         onDrop={onDrop}
         minZoom={0.4}
         maxZoom={2}
         fitView={true}
       >
-        {showControls && <CanvasControls onLayout={onLayout} onAddNode={onAddNode} onUploadFile={onUploadFile} theme={theme} />}
+        <div style={showControls ? undefined : HIDDEN_STYLE}>
+          <CanvasControls onLayout={onLayout} onAddNode={onAddNode} onUploadFile={onUploadFile} theme={theme} />
+        </div>
       </ReactFlow>
 
       {/* ── Full Sync Loading Overlay ── */}

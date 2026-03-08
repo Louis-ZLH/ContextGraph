@@ -1,7 +1,7 @@
 import {
   FileText,
   FileSpreadsheet,
-  FileImage,
+  Image,
   File,
 } from "lucide-react";
 import type { FileCategory } from "../../../feature/canvas/canvasSlice";
@@ -9,7 +9,7 @@ import type { FileCategory } from "../../../feature/canvas/canvasSlice";
 export function FileTypeIcon({ fileType, size = 28 }: { fileType?: FileCategory; size?: number }) {
   switch (fileType) {
     case "image":
-      return <FileImage size={size} className="source-meta-icon" />;
+      return <Image size={size} className="source-meta-icon" />;
     case "pdf":
       return <FileText size={size} className="source-meta-icon" />;
     case "excel":
