@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
-import { Lock, User } from "lucide-react";
+import { Lock, User, Eye, EyeOff } from "lucide-react";
 import { AuthLayout } from "../../ui/auth/AuthLayout";
 import { AuthCard } from "../../ui/auth/AuthCard";
 import { AuthInput } from "../../ui/auth/AuthInput";
@@ -14,6 +14,7 @@ import { isValidEmail, isValidPassword } from "../../util/valid";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    
+
     if(!isValidEmail(email)) {
       toast.error("Please enter a valid email address");
       setIsLoading(false);
@@ -32,7 +33,7 @@ export default function LoginPage() {
       toast.error(message || "Invalid password");
       setIsLoading(false);
       return;
-    }  
+    }
 
     const result = await loginUser(email, password);
     if(!result.success) {
@@ -49,51 +50,65 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <AuthCard
-        title="Access Terminal"
-        subtitle="Authenticate to access neural interface."
+        title="Welcome Back"
+        subtitle="Sign in to your account."
         icon={Lock}
       >
         <form onSubmit={handleLogin} className="space-y-6">
           <AuthInput
-            label="Identity / Email"
+            label="Email"
             icon={User}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@contextcanvas.ai"
+            placeholder="you@example.com"
             required
           />
 
           <AuthInput
-            label="Passcode"
+            label="Password"
             rightElement={
               <Link
                 to="/forgot-password"
-                className="text-xs text-slate-500 hover:text-cyber-neon transition-colors"
+                className="text-xs text-stone-400 hover:text-orange-600 transition-colors"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
               >
-                Forgot key?
+                Forgot password?
               </Link>
             }
             icon={Lock}
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
+            endAdornment={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="focus:outline-none flex items-center justify-center p-1"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
+                ) : (
+                  <Eye className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
+                )}
+              </button>
+            }
           />
 
-          <AuthButton isLoading={isLoading} loadingText="Authenticating...">
-            Establish Connection
+          <AuthButton isLoading={isLoading} loadingText="Signing in...">
+            Sign In
           </AuthButton>
         </form>
 
         <SocialLogin />
 
-        <p className="text-center mt-6 text-slate-500 text-sm">
-          New to the system?{" "}
+        <p className="text-center mt-6 text-stone-500 text-sm" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+          Don't have an account?{" "}
           <Link
             to="/register"
-            className="text-cyber-neon hover:text-emerald-300 transition-colors"
+            className="text-orange-600 hover:text-orange-700 transition-colors font-medium"
           >
             Sign Up
           </Link>

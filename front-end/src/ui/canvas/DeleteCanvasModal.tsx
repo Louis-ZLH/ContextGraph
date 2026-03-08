@@ -51,7 +51,7 @@ export function DeleteCanvasModal({ isOpen, onClose, canvasId, canvasTitle }: De
         onClick={onClose}
         disabled={isPending}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-          theme === "cyber"
+          theme === "dark"
             ? "hover:bg-white/10 text-zinc-400 hover:text-white"
             : "hover:bg-black/5 text-gray-500 hover:text-gray-900"
         }`}
@@ -62,7 +62,7 @@ export function DeleteCanvasModal({ isOpen, onClose, canvasId, canvasTitle }: De
         onClick={handleDelete}
         disabled={isPending}
         className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-          theme === "cyber"
+          theme === "dark"
             ? "bg-red-900/50 hover:bg-red-900/70 text-red-200 border border-red-800"
             : "bg-red-600 hover:bg-red-700 text-white"
         }`}
@@ -84,7 +84,7 @@ export function DeleteCanvasModal({ isOpen, onClose, canvasId, canvasTitle }: De
       }
       footer={footer}
     >
-      <div className={`text-sm ${theme === "cyber" ? "text-zinc-300" : "text-gray-600"}`}>
+      <div className={`text-sm ${theme === "dark" ? "text-zinc-300" : "text-gray-600"}`}>
         Are you sure you want to delete <span className="font-bold">"{canvasTitle}"</span>? This action cannot be undone.
       </div>
     </Modal>

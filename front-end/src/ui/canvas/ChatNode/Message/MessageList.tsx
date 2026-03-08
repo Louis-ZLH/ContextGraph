@@ -135,8 +135,8 @@ function MessageList({
       className={
         "flex-1 overflow-y-auto nowheel select-text cursor-default pb-16" +
         (isMaximized ? "" : " px-2") +
-        (theme === "cyber"
-          ? " CyberScroller"
+        (theme === "dark"
+          ? " DarkScroller"
           : theme === "saas"
             ? " ModernScroller"
             : "")

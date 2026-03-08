@@ -1,13 +1,13 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-export type ThemeName = "saas" | "cyber" | "paper";
+export type ThemeName = "saas" | "dark" | "paper";
 
 const getInitialTheme = (): ThemeName => {
   const stored = localStorage.getItem("theme");
-  if (stored === "saas" || stored === "cyber" || stored === "paper") {
+  if (stored === "saas" || stored === "dark" || stored === "paper") {
     return stored;
   }
-  return "cyber";
+  return "paper";
 };
 
 const userSlice = createSlice({

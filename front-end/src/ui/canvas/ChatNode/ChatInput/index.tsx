@@ -163,7 +163,7 @@ function ChatInput({
     >
       <div
         className="flex flex-col rounded-4xl border-[0.5px] shadow-sm nowheel"
-        style={{ borderColor: "var(--border-main)" }}
+        style={{ borderColor: "var(--border-main)", backgroundColor: "var(--input-bg, transparent)" }}
       >
         <div className={isMultiline || mode ? "" : "relative"}>
           <textarea

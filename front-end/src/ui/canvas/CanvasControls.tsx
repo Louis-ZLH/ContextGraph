@@ -28,7 +28,7 @@ export const CanvasControls = memo(function CanvasControls({ onLayout, onAddNode
   );
 
   const btnClass = `nopan cursor-pointer px-3 py-1.5 rounded-md text-xs font-medium node-card transition-[filter] ${
-    theme === "cyber" ? "hover:brightness-150" : "hover:brightness-95"
+    theme === "dark" ? "hover:brightness-150" : "hover:brightness-95"
   }`;
 
   return (
@@ -111,14 +111,14 @@ export const CanvasControls = memo(function CanvasControls({ onLayout, onAddNode
         position="top-right"
         // Dynamic mask color based on theme
         maskColor={
-          theme === "cyber"
-            ? "rgba(11, 17, 32, 0.7)" // Dark mask for cyber
+          theme === "dark"
+            ? "rgba(33, 33, 33, 0.7)" // Dark mask
             : "rgba(243, 244, 246, 0.7)" // Light mask for saas/paper
         }
         // Dynamic node color based on theme
         nodeColor={
-          theme === "cyber"
-            ? "#334155" // Slate-700 for cyber nodes
+          theme === "dark"
+            ? "#333333" // Neutral dark for nodes
             : "#e5e7eb" // Gray-200 for saas/paper nodes
         }
       />

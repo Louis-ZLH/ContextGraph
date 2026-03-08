@@ -1,4 +1,4 @@
-import { X, User as UserIcon, LogOut, CreditCard, Bell, Shield, Palette, Sun, Terminal, ScrollText, Check } from "lucide-react";
+import { X, User as UserIcon, LogOut, CreditCard, Bell, Shield, Palette, Sun, Moon, ScrollText, Check } from "lucide-react";
 import { useEffect, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -27,7 +27,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
 
   const themes: { name: ThemeName; label: string; icon: typeof Sun; accent: string; bg: string; preview: string }[] = [
     { name: "saas", label: "SaaS", icon: Sun, accent: "blue", bg: "bg-white", preview: "Light & professional" },
-    { name: "cyber", label: "Cyber", icon: Terminal, accent: "emerald", bg: "bg-slate-900", preview: "Dark & techy" },
+    { name: "dark", label: "Dark", icon: Moon, accent: "neutral", bg: "bg-[#212121]", preview: "Clean & modern" },
     { name: "paper", label: "Paper", icon: ScrollText, accent: "orange", bg: "bg-[#fdfbf7]", preview: "Warm & minimal" },
   ];
   // ESC 键关闭
@@ -84,7 +84,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
       {/* 遮罩层 */}
       <div
         className={`absolute inset-0 transition-opacity duration-300 ${
-          theme === "cyber"
+          theme === "dark"
             ? "bg-black/70 backdrop-blur-sm"
             : theme === "paper"
               ? "bg-stone-900/40"
@@ -96,8 +96,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         className={`relative w-full max-w-md mx-4 rounded-2xl shadow-2xl transform transition-[transform,opacity] duration-300 animate-in fade-in zoom-in-95 ${
-          theme === "cyber"
-            ? "bg-slate-900 border border-slate-700"
+          theme === "dark"
+            ? "bg-[#2f2f2f] border border-white/10"
             : theme === "paper"
               ? "bg-[#fdfbf7] border border-stone-300"
               : "bg-white border border-gray-200"
@@ -107,8 +107,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
         <button
           onClick={onClose}
           className={`absolute top-4 right-4 p-2 rounded-full transition-colors cursor-pointer ${
-            theme === "cyber"
-              ? "hover:bg-white/10 text-slate-400 hover:text-white"
+            theme === "dark"
+              ? "hover:bg-white/10 text-neutral-400 hover:text-white"
               : theme === "paper"
                 ? "hover:bg-stone-200 text-stone-500 hover:text-stone-800"
                 : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"
@@ -125,8 +125,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
                 src={user.avatarUrl}
                 alt="User Avatar"
                 className={`w-16 h-16 rounded-full ring-4 ring-offset-2 ${
-                  theme === "cyber"
-                    ? "ring-emerald-500 ring-offset-slate-900"
+                  theme === "dark"
+                    ? "ring-neutral-400 ring-offset-[#2f2f2f]"
                     : theme === "paper"
                       ? "ring-orange-500 ring-offset-[#fdfbf7]"
                       : "ring-blue-500 ring-offset-white"
@@ -135,8 +135,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
             ) : (
               <div
                 className={`w-16 h-16 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 ring-4 ring-offset-2 ${
-                  theme === "cyber"
-                    ? "ring-purple-500/50 ring-offset-slate-900"
+                  theme === "dark"
+                    ? "ring-neutral-500/50 ring-offset-[#2f2f2f]"
                     : theme === "paper"
                       ? "ring-purple-400/50 ring-offset-[#fdfbf7]"
                       : "ring-purple-400/50 ring-offset-white"
@@ -153,8 +153,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
               <p className="text-sm text-secondary">{user?.email || "guest@example.com"}</p>
               <span
                 className={`inline-block mt-2 px-3 py-1 text-xs font-medium rounded-full ${
-                  theme === "cyber"
-                    ? "bg-emerald-500/20 text-emerald-400"
+                  theme === "dark"
+                    ? "bg-white/10 text-neutral-300"
                     : theme === "paper"
                       ? "bg-orange-100 text-orange-600"
                       : "bg-blue-100 text-blue-600"
@@ -176,7 +176,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
               <button
                 onClick={item.label === "Appearance" ? () => setShowThemePicker((v) => !v) : undefined}
                 className={`w-full flex items-center gap-4 p-3 rounded-xl transition-colors cursor-pointer text-left ${
-                  theme === "cyber"
+                  theme === "dark"
                     ? "hover:bg-white/5"
                     : theme === "paper"
                       ? "hover:bg-stone-100"
@@ -185,8 +185,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
               >
                 <div
                   className={`p-2 rounded-lg ${
-                    theme === "cyber"
-                      ? "bg-emerald-500/10"
+                    theme === "dark"
+                      ? "bg-white/5"
                       : theme === "paper"
                         ? "bg-orange-100"
                         : "bg-blue-50"
@@ -195,8 +195,8 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
                   <item.icon
                     size={18}
                     className={
-                      theme === "cyber"
-                        ? "text-emerald-400"
+                      theme === "dark"
+                        ? "text-neutral-300"
                         : theme === "paper"
                           ? "text-orange-500"
                           : "text-blue-500"
@@ -226,13 +226,13 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
                           onClick={() => dispatch(changeTheme(t.name))}
                           className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer ${
                             isActive
-                              ? theme === "cyber"
-                                ? "border-emerald-500 bg-emerald-500/10"
+                              ? theme === "dark"
+                                ? "border-white/30 bg-white/5"
                                 : theme === "paper"
                                   ? "border-orange-500 bg-orange-50"
                                   : "border-blue-500 bg-blue-50"
-                              : theme === "cyber"
-                                ? "border-slate-700 hover:border-slate-500"
+                              : theme === "dark"
+                                ? "border-white/10 hover:border-white/20"
                                 : theme === "paper"
                                   ? "border-stone-200 hover:border-stone-400"
                                   : "border-gray-200 hover:border-gray-300"
@@ -240,17 +240,17 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
                         >
                           {isActive && (
                             <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center ${
-                              theme === "cyber" ? "bg-emerald-500" : theme === "paper" ? "bg-orange-500" : "bg-blue-500"
+                              theme === "dark" ? "bg-white" : theme === "paper" ? "bg-orange-500" : "bg-blue-500"
                             }`}>
                               <Check size={10} className="text-white" />
                             </div>
                           )}
                           {/* 主题色块预览 */}
                           <div className={`w-8 h-8 rounded-lg ${t.bg} border ${
-                            t.name === "cyber" ? "border-slate-600" : t.name === "paper" ? "border-stone-300" : "border-gray-200"
+                            t.name === "dark" ? "border-white/10" : t.name === "paper" ? "border-stone-300" : "border-gray-200"
                           }`}>
                             <t.icon size={16} className={`m-auto mt-1.5 ${
-                              t.name === "cyber" ? "text-emerald-400" : t.name === "paper" ? "text-orange-500" : "text-blue-500"
+                              t.name === "dark" ? "text-neutral-300" : t.name === "paper" ? "text-orange-500" : "text-blue-500"
                             }`} />
                           </div>
                           <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
@@ -276,7 +276,7 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
         <div className="p-4">
           <button
             className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-colors cursor-pointer ${
-              theme === "cyber"
+              theme === "dark"
                 ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                 : theme === "paper"
                   ? "bg-red-50 text-red-600 hover:bg-red-100"

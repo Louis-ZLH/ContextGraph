@@ -63,6 +63,25 @@
       transparent 80%
     );
   }
+
+  /* Paper theme landing/auth utilities */
+  .paper-card {
+    @apply bg-white border border-stone-200 rounded-2xl;
+    box-shadow: 4px 4px 0px rgba(41, 37, 36, 0.08);
+  }
+
+  .paper-card-hover {
+    @apply transition-all duration-300;
+  }
+  .paper-card-hover:hover {
+    box-shadow: 6px 6px 0px rgba(41, 37, 36, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .paper-texture {
+    @apply absolute inset-0 pointer-events-none opacity-[0.03];
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  }
 }
 
 /* ============ NProgress Overrides (YouTube Style) ============ */
@@ -106,40 +125,47 @@
   --edge-width: 2;
   --edge-dasharray: none;
 
+  --code-block-bg: #ffffff;
+  --code-header-bg: #f9fafb;
+
   /* NProgress SaaS */
   --nprogress-color: #2563eb;
   --nprogress-shadow: 0 0 10px #2563eb, 0 0 5px #2563eb;
 }
 
-/* 2. Cyber Dark */
-[data-theme="cyber"] {
-  --bg-app: #0b1120;
-  --bg-sidebar: #020617;
-  --bg-header: rgba(15, 23, 42, 0.8);
-  --bg-canvas: #0b1120;
-  --border-main: #334155;
+/* 2. Dark (参考 Claude/ChatGPT) */
+[data-theme="dark"] {
+  --bg-app: #212121;
+  --bg-sidebar: #171717;
+  --bg-header: #212121;
+  --bg-canvas: #1a1a1a;
+  --border-main: rgba(255, 255, 255, 0.06);
 
-  --text-primary: #e2e8f0;
-  --text-secondary: #64748b;
-  --accent: #10b981;
-  --accent-light: rgba(16, 185, 129, 0.1);
+  --text-primary: #efefef;
+  --text-secondary: #9a9a9a;
+  --accent: #efefef;
+  --accent-light: rgba(255, 255, 255, 0.06);
 
-  --node-bg: #1e293b;
-  --node-shadow: 0 0 0 1px #334155, 0 0 15px rgba(16, 185, 129, 0.1);
+  --node-bg: #212121;
+  --input-bg: #2a2a2a;
+  --node-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
 
-  --bubble-user: #10b981;
-  --bubble-user-text: #064e3b;
-  --bubble-ai: #0f172a;
-  --bubble-ai-text: #e2e8f0;
+  --bubble-user: #424242;
+  --bubble-user-text: #ececec;
+  --bubble-ai: #212121;
+  --bubble-ai-text: #ececec;
 
-  --edge-stroke: #10b981;
-  --edge-opacity: 0.6;
-  --edge-width: 2;
+  --code-block-bg: #1a1a1a;
+  --code-header-bg: #252525;
+
+  --edge-stroke: #666666;
+  --edge-opacity: 0.5;
+  --edge-width: 1.5;
   --edge-dasharray: none;
 
-  /* NProgress Cyber */
-  --nprogress-color: linear-gradient(90deg, #d946ef, #22d3ee);
-  --nprogress-shadow: 0 0 20px #d946ef, 0 0 40px #22d3ee;
+  /* NProgress Dark */
+  --nprogress-color: #ececec;
+  --nprogress-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
 /* 3. Paper Note */
@@ -168,6 +194,9 @@
   --edge-width: 1.5;
   --edge-dasharray: 5 5;
 
+  --code-block-bg: #ffffff;
+  --code-header-bg: #f9f8f5;
+
   /* NProgress Paper */
   --nprogress-color: #ea580c;
   --nprogress-shadow: 0 1px 2px rgba(234, 88, 12, 0.2);
@@ -181,9 +210,9 @@ body {
   font-family: "Inter", system-ui, sans-serif;
 }
 
-[data-theme="cyber"] body,
-[data-theme="cyber"] {
-  font-family: "Fira Code", "Menlo", monospace;
+[data-theme="dark"] body,
+[data-theme="dark"] {
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 [data-theme="paper"] body,
@@ -353,7 +382,7 @@ body {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: white;
+  color: var(--node-bg);
   background: var(--accent);
   padding: 3px 8px;
   border-radius: 4px;
@@ -553,23 +582,23 @@ body {
   border-radius: 3px;
 }
 
-.CyberScroller {
+.DarkScroller {
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent; /* Slate-700: Subtle dark blue-grey */
+  scrollbar-color: #444444 transparent;
 }
-.CyberScroller::-webkit-scrollbar {
+.DarkScroller::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-.CyberScroller::-webkit-scrollbar-track {
+.DarkScroller::-webkit-scrollbar-track {
   background: transparent;
 }
-.CyberScroller::-webkit-scrollbar-thumb {
-  background-color: #334155; /* Slate-700 */
+.DarkScroller::-webkit-scrollbar-thumb {
+  background-color: #444444;
   border-radius: 3px;
 }
-.CyberScroller::-webkit-scrollbar-thumb:hover {
-  background-color: #64748b; /* Slate-500: Lighter on hover */
+.DarkScroller::-webkit-scrollbar-thumb:hover {
+  background-color: #666666;
 }
 
 /* ============ React Flow Controls & MiniMap Theme Adaptation ============ */

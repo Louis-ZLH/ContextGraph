@@ -79,7 +79,7 @@ export function RenameCanvasModal({ isOpen, onClose, canvasId, currentTitle }: R
         onClick={onClose}
         disabled={isPending}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-          theme === "cyber" 
+          theme === "dark" 
             ? "hover:bg-white/10 text-zinc-400 hover:text-white"
             : "hover:bg-black/5 text-gray-500 hover:text-gray-900"
         }`}
@@ -90,8 +90,8 @@ export function RenameCanvasModal({ isOpen, onClose, canvasId, currentTitle }: R
         onClick={() => handleSubmit()}
         disabled={isPending}
         className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-          theme === "cyber"
-            ? "bg-emerald-600 hover:bg-emerald-500 text-white disabled:bg-emerald-600/50"
+          theme === "dark"
+            ? "bg-white text-black hover:bg-neutral-200 disabled:bg-white/50"
             : theme === "paper"
                 ? "bg-orange-600 hover:bg-orange-500 text-white disabled:bg-orange-600/50"
                 : "bg-blue-600 hover:bg-blue-500 text-white disabled:bg-blue-600/50"
@@ -102,8 +102,8 @@ export function RenameCanvasModal({ isOpen, onClose, canvasId, currentTitle }: R
     </>
   );
 
-  const inputClass = theme === "cyber"
-    ? "bg-zinc-800 border-zinc-700 text-zinc-100 focus:ring-emerald-500/50"
+  const inputClass = theme === "dark"
+    ? "bg-zinc-800 border-zinc-700 text-zinc-100 focus:ring-white/30"
     : theme === "paper"
         ? "bg-white border-stone-300 text-stone-800 focus:ring-orange-500/50"
         : "bg-white border-gray-300 text-gray-900 focus:ring-blue-500/50";
@@ -118,7 +118,7 @@ export function RenameCanvasModal({ isOpen, onClose, canvasId, currentTitle }: R
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={`block text-sm font-medium mb-1 ${
-             theme === "cyber" ? "text-zinc-400" : "text-gray-500"
+             theme === "dark" ? "text-zinc-400" : "text-gray-500"
           }`}>
             Canvas Name
           </label>

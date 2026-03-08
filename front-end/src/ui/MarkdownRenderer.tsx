@@ -77,7 +77,7 @@ const MemoizedMarkdownBlock = memo(
       {normalizeLatex(content)}
     </ReactMarkdown>
   ),
-  (prev, next) => prev.content === next.content,
+  (prev, next) => prev.content === next.content && prev.components === next.components,
 );
 MemoizedMarkdownBlock.displayName = "MemoizedMarkdownBlock";
 
@@ -102,7 +102,7 @@ function MemoizedMarkdown({ content, id, components }: { content: string; id: st
 }
 
 const MarkdownRenderer = memo(({ content, theme = "saas", id = "md" }: MarkdownRendererProps) => {
-  const isDark = theme === "cyber";
+  const isDark = theme === "dark";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const codeStyle: any = isDark ? vscDarkPlus : oneLight;
 
@@ -163,16 +163,17 @@ const MarkdownRenderer = memo(({ content, theme = "saas", id = "md" }: MarkdownR
       const match = /language-(\w+)/.exec(className || "");
       return match ? (
         <div
-          className="rounded-lg overflow-hidden my-2"
+          className="not-prose rounded-lg overflow-hidden my-2"
           style={{
             border: "1px solid var(--border-main)",
-            backgroundColor: "var(--bg-canvas)",
+            backgroundColor: "var(--code-block-bg)",
           }}
         >
           <div
             className="flex justify-between items-center px-3 py-1.5 text-[11px]"
             style={{
               borderBottom: "1px solid var(--border-main)",
+              backgroundColor: "var(--code-header-bg)",
               color: "var(--text-secondary)",
             }}
           >
@@ -191,6 +192,7 @@ const MarkdownRenderer = memo(({ content, theme = "saas", id = "md" }: MarkdownR
               background: "transparent",
               padding: "0.75rem 1rem",
             }}
+            codeTagProps={{ style: { background: "transparent" } }}
           >
             {String(children).replace(/\n$/, "")}
           </SyntaxHighlighter>
@@ -199,7 +201,7 @@ const MarkdownRenderer = memo(({ content, theme = "saas", id = "md" }: MarkdownR
         <code
           className="px-1 py-0.5 rounded text-xs font-mono"
           style={{
-            backgroundColor: isDark ? "#1e293b" : "var(--accent-light)",
+            backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "var(--accent-light)",
             color: "var(--accent)",
           }}
           ref={ref}

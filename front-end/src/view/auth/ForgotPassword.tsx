@@ -43,10 +43,10 @@ export default function ForgotPasswordPage() {
       toast.error("Please enter a valid email address");
       return;
     }
-    
+
     setIsSendingCode(true);
     const result = await sendVerificationCode(email, "reset_password");
-    
+
     if(result.success) {
       toast.success(result.message);
       setIsSendingCode(false);
@@ -66,15 +66,14 @@ export default function ForgotPasswordPage() {
     }
 
     setIsVerifying(true);
-    // Verify code first to allow user to proceed
     const result = await verifyVerificationCode(email, verificationCode, "reset_password");
-    
+
     if(!result.success) {
       toast.error(result.message);
       setIsVerifying(false);
       return;
     }
-    
+
     setIsVerifying(false);
     setCooldown(0);
     toast.success(result.message);
@@ -100,15 +99,14 @@ export default function ForgotPasswordPage() {
     }
 
     setIsResetting(true);
-    // Pass email, password AND code to resetPassword
     const result = await resetPassword(email, password, verificationCode);
-    
+
     if(!result.success) {
       toast.error(result.message);
       setIsResetting(false);
       return;
     }
-    
+
     setIsResetting(false);
     toast.success(result.message);
     navigate("/canvas");
@@ -117,8 +115,8 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout>
       <AuthCard
-        title="Recovery Protocol"
-        subtitle={step === 1 ? "Enter identity to reset access key." : "Set new access key."}
+        title="Reset Password"
+        subtitle={step === 1 ? "Enter your email to reset your password." : "Set your new password."}
         icon={KeyRound}
       >
         {step === 1 ? (
@@ -128,12 +126,12 @@ export default function ForgotPasswordPage() {
                <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <AuthInput
-                        label="Identity / Email"
+                        label="Email"
                         icon={Mail}
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="user@contextcanvas.ai"
+                        placeholder="you@example.com"
                         required
                         disabled={cooldown > 0 && cooldown < 61 || isSendingCode}
                     />
@@ -142,7 +140,8 @@ export default function ForgotPasswordPage() {
                     type="button"
                     onClick={handleSendCode}
                     disabled={isSendingCode || cooldown > 0 || !email}
-                    className="h-[46px] px-4 mb-px bg-slate-800 border border-white/10 hover:border-cyber-neon/50 text-cyber-neon text-xs font-mono rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="h-[46px] px-4 mb-px bg-stone-100 border border-stone-200 hover:border-orange-400 text-stone-700 text-xs rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
                   >
                     {isSendingCode ? "Sending..." : cooldown > 0 ? `${cooldown}s` : "Send Code"}
                   </button>
@@ -166,13 +165,13 @@ export default function ForgotPasswordPage() {
         ) : (
           /* STEP 2: New Password */
           <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-3 text-sm text-emerald-400 mb-6">
+             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3 text-sm text-green-700 mb-6">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Identity verified: {email}</span>
+                <span>Email verified: {email}</span>
              </div>
 
             <AuthInput
-              label="New Passcode"
+              label="New Password"
               icon={Lock}
               type={showPassword ? "text" : "password"}
               value={password}
@@ -187,16 +186,16 @@ export default function ForgotPasswordPage() {
                   className="focus:outline-none flex items-center justify-center p-1"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                    <EyeOff className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
                   ) : (
-                    <Eye className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                    <Eye className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
                   )}
                 </button>
               }
             />
 
             <AuthInput
-              label="Confirm Passcode"
+              label="Confirm Password"
               icon={Lock}
               type={showPassword ? "text" : "password"}
               value={confirmPassword}
@@ -206,27 +205,29 @@ export default function ForgotPasswordPage() {
             />
 
             <div className="flex gap-3">
-               <button 
-                type="button" 
+               <button
+                type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-3 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors font-mono text-sm"
+                className="px-4 py-3 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors text-sm"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
                >
                  Back
                </button>
                <AuthButton isLoading={isResetting} loadingText="Resetting...">
-                 Reset Access Key
+                 Reset Password
                </AuthButton>
             </div>
           </form>
         )}
 
-        <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
+        <div className="mt-8 pt-6 border-t border-stone-200 flex justify-center">
           <Link
             to="/login"
-            className="flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors group"
+            className="flex items-center gap-2 text-sm text-stone-500 hover:text-stone-700 transition-colors group"
+            style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Access Terminal
+            Back to Sign In
           </Link>
         </div>
       </AuthCard>

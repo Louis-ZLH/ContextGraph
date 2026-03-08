@@ -50,7 +50,7 @@ export function Sidebar({ user }: { user: User | null }) {
         <div className="h-14 flex items-center justify-center">
           <button
             onClick={() => setIsOpen(true)}
-            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
           >
             <PanelLeftOpen size={24} strokeWidth={1.25} />
           </button>
@@ -60,7 +60,7 @@ export function Sidebar({ user }: { user: User | null }) {
         <div className="flex justify-center mt-2">
           <Link
             to="/canvas"
-            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
             title="New Canvas"
           >
             <Plus size={24} strokeWidth={1.25} />
@@ -71,7 +71,7 @@ export function Sidebar({ user }: { user: User | null }) {
         <div className="p-4 flex justify-center">
           <button
             onClick={() => setIsModalOpen(true)}
-            className={`p-2 rounded-lg cursor-pointer transition-colors duration-200 ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            className={`p-2 rounded-lg cursor-pointer transition-colors duration-200 ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
           >
             {user?.avatarUrl ? (
               <img
@@ -96,7 +96,7 @@ export function Sidebar({ user }: { user: User | null }) {
         <div className="h-14 flex items-center justify-between px-4 border-b border-main">
           <div className="flex items-center">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3 bg-accent">
-              <Network size={16} className="text-white" />
+              <Network size={16} style={{ color: "var(--node-bg)" }} />
             </div>
             <span
               className="font-bold text-lg tracking-tight"
@@ -107,19 +107,19 @@ export function Sidebar({ user }: { user: User | null }) {
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            className={`w-[36px] h-[36px] flex items-center justify-center rounded-lg cursor-pointer text-secondary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
           >
             <PanelLeftClose size={24} strokeWidth={1.25} />
           </button>
         </div>
 
         {/* Nav */}
-        <div className={`flex-1 overflow-y-auto pb-4 space-y-6 ${theme === "cyber" ? "CyberScroller" : "ModernScroller"}`}>
+        <div className={`flex-1 overflow-y-auto pb-4 space-y-6 ${theme === "dark" ? "DarkScroller" : "ModernScroller"}`}>
           {/* Actions Section */}
           <div className="space-y-1 sticky top-0 bg-sidebar pt-4 z-20 shadow-sm">
             <Link
               to="/canvas"
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             >
               <Plus
                 size={18}
@@ -130,7 +130,7 @@ export function Sidebar({ user }: { user: User | null }) {
 
             <Link
               to="/canvas/myresource"
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             >
               <FolderOpen
                 size={18}
@@ -141,7 +141,7 @@ export function Sidebar({ user }: { user: User | null }) {
 
             <Link
               to="/canvas/search"
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group text-primary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             >
               <Search
                 size={18}
@@ -173,7 +173,7 @@ export function Sidebar({ user }: { user: User | null }) {
         <div className="p-4 border-t border-main">
           <button
             onClick={() => setIsModalOpen(true)}
-            className={`w-full flex items-center gap-3 p-2 rounded-lg cursor-pointer bg-transparent transition-colors duration-200 ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
+            className={`w-full flex items-center gap-3 p-2 rounded-lg cursor-pointer bg-transparent transition-colors duration-200 ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/10"}`}
           >
             {user?.avatarUrl ? (
               <img

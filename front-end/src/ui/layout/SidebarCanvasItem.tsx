@@ -82,11 +82,11 @@ export const SidebarCanvasItem = memo(function SidebarCanvasItem({ canvas, theme
     setShowMenu(false);
   };
 
-  const menuBg = theme === "cyber" 
+  const menuBg = theme === "dark" 
     ? "bg-zinc-900 border-zinc-700 text-zinc-200" 
     : "bg-white border-gray-200 text-gray-700";
     
-  const menuHover = theme === "cyber"
+  const menuHover = theme === "dark"
     ? "hover:bg-zinc-800"
     : "hover:bg-gray-50";
 
@@ -96,7 +96,7 @@ export const SidebarCanvasItem = memo(function SidebarCanvasItem({ canvas, theme
         className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group relative ${
           isActive
             ? "bg-accent/15 text-accent"
-            : `text-primary ${theme === "cyber" ? "hover:bg-white/10" : "hover:bg-black/5"}`
+            : `text-primary ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}`
         }`}
       >
         <Link

@@ -12,7 +12,7 @@ import { sendVerificationCode, verifyVerificationCode, registerUser } from "../.
 
 export default function RegisterPage() {
   const [step, setStep] = useState<1 | 2>(1);
-  
+
   // Step 1: Email Verification
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  
+
   const navigate = useNavigate();
 
   // Handle cooldown timer
@@ -46,9 +46,9 @@ export default function RegisterPage() {
       toast.error("Please enter a valid email address");
       return;
     }
-    
+
     setIsSendingCode(true);
-    
+
     const result = await sendVerificationCode(email, "register");
     if(result.success) {
       toast.success(result.message);
@@ -110,8 +110,8 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <AuthCard
-        title={step === 1 ? "Initialize Identity" : "Finalize Access"}
-        subtitle={step === 1 ? "Verify communication channel." : "Set your neural identity parameters."}
+        title={step === 1 ? "Create Account" : "Complete Setup"}
+        subtitle={step === 1 ? "Verify your email to get started." : "Choose your username and password."}
         icon={step === 1 ? Mail : User}
       >
         {step === 1 ? (
@@ -121,21 +121,22 @@ export default function RegisterPage() {
                <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <AuthInput
-                        label="Identity / Email"
+                        label="Email"
                         icon={Mail}
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="neo@matrix.io"
+                        placeholder="you@example.com"
                         required
-                        disabled={cooldown > 0 && cooldown < 61 || isSendingCode} // Keep enabled to allow correction, but generally handling via button logic
+                        disabled={cooldown > 0 && cooldown < 61 || isSendingCode}
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleSendCode}
                     disabled={isSendingCode || cooldown > 0 || !email}
-                    className="h-[46px] px-4 mb-px bg-slate-800 border border-white/10 hover:border-cyber-neon/50 text-cyber-neon text-xs font-mono rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="h-[46px] px-4 mb-px bg-stone-100 border border-stone-200 hover:border-orange-400 text-stone-700 text-xs rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
                   >
                     {isSendingCode ? "Sending..." : cooldown > 0 ? `${cooldown}s` : "Send Code"}
                   </button>
@@ -159,24 +160,24 @@ export default function RegisterPage() {
         ) : (
           /* STEP 2: User Details */
           <form onSubmit={handleRegister} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-3 text-sm text-emerald-400 mb-6">
+             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3 text-sm text-green-700 mb-6">
                 <ShieldCheck className="w-4 h-4" />
                 <span>Email verified: {email}</span>
              </div>
 
             <AuthInput
-              label="Codename / Name"
+              label="Name"
               icon={User}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Neo"
+              placeholder="Your name"
               required
               autoFocus
             />
 
             <AuthInput
-              label="Passcode"
+              label="Password"
               icon={Lock}
               type={showPassword ? "text" : "password"}
               value={password}
@@ -190,24 +191,25 @@ export default function RegisterPage() {
                   className="focus:outline-none flex items-center justify-center p-1"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                    <EyeOff className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
                   ) : (
-                    <Eye className="w-4 h-4 text-slate-500 hover:text-cyber-neon transition-colors" />
+                    <Eye className="w-4 h-4 text-stone-400 hover:text-orange-600 transition-colors" />
                   )}
                 </button>
               }
             />
 
             <div className="flex gap-3">
-               <button 
-                type="button" 
+               <button
+                type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-3 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-colors font-mono text-sm"
+                className="px-4 py-3 rounded-lg border border-stone-200 text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors text-sm"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
                >
                  Back
                </button>
-               <AuthButton isLoading={isRegistering} loadingText="Initializing...">
-                 Create Access
+               <AuthButton isLoading={isRegistering} loadingText="Creating account...">
+                 Create Account
                </AuthButton>
             </div>
           </form>
@@ -215,13 +217,13 @@ export default function RegisterPage() {
 
         <SocialLogin />
 
-        <p className="text-center mt-6 text-slate-500 text-sm">
-          Already have access?{" "}
+        <p className="text-center mt-6 text-stone-500 text-sm" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+          Already have an account?{" "}
           <Link
             to="/login"
-            className="text-cyber-neon hover:text-emerald-300 transition-colors"
+            className="text-orange-600 hover:text-orange-700 transition-colors font-medium"
           >
-            Login
+            Sign In
           </Link>
         </p>
       </AuthCard>

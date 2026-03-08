@@ -6,14 +6,12 @@ import { Footer } from "../ui/landing/Footer";
 
 export default function LandingPage() {
   return (
-    <div className="relative antialiased overflow-x-hidden font-sans bg-cyber-dark selection:bg-cyber-neon/30 h-screen overflow-y-auto text-slate-200 CyberScroller">
-      {/* Background Effects */}
-      {/* 1. 新增：超大纯色底板，由它来遮挡回弹时的白边，设为 -inset-[100vh] 足够大 */}
-      <div className="fixed -inset-[100vh] bg-cyber-dark -z-10 pointer-events-none"></div>
+    <div className="relative antialiased overflow-x-hidden bg-[#fdfbf7] selection:bg-orange-200/40 h-screen overflow-y-auto text-stone-800 ModernScroller" style={{ fontFamily: "'Georgia', 'Cambria', 'Times New Roman', serif" }}>
+      {/* Background: Large solid color to cover scroll bounce */}
+      <div className="fixed -inset-[100vh] bg-[#fdfbf7] -z-10 pointer-events-none"></div>
 
-      {/* 2. 原有的光效层保持 inset-0 不变，确保光效位置在屏幕四周 */}
-      <div className="fixed inset-0 bg-[image:var(--image-cyber-gradient)] opacity-80 pointer-events-none"></div>
-      <div className="perspective-grid"></div>
+      {/* Subtle paper texture overlay */}
+      <div className="paper-texture fixed inset-0"></div>
 
       <LandingHeader />
 
