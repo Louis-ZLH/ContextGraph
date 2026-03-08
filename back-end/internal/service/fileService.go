@@ -82,6 +82,9 @@ type FileRepo interface {
 	UpdateNodeFileID(ctx context.Context, nodeID string, fileID *int64) error
 	SetFileProcessingKeys(ctx context.Context, fileID int64) error
 	PublishFileConvert(ctx context.Context, fileID int64, minioPath string, contentType string) error
+	ListFilesByUser(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error)
+	DeleteFileByID(ctx context.Context, fileID int64) error
+	RemoveMinioObject(ctx context.Context, minioPath string) error
 }
 
 type FileService struct {
@@ -261,6 +264,33 @@ func (s *FileService) DownloadFile(ctx context.Context, userID int64, fileID int
 	}
 
 	return file, obj, nil
+}
+
+// ListFiles 获取用户文件列表
+func (s *FileService) ListFiles(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error) {
+	return s.repo.ListFilesByUser(ctx, userID, keyword, page, limit)
+}
+
+// DeleteFile 删除文件（验证所有权 → 解绑节点 → 软删除 → 删除 MinIO）
+func (s *FileService) DeleteFile(ctx context.Context, userID int64, fileID int64) error {
+	// 1. 获取文件记录
+	file, err := s.repo.GetFileByID(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	// 2. 验证所有权
+	if file.UserID != userID {
+		return apperr.Forbidden("无权删除该文件")
+	}
+	// 3. 数据库事务：解绑节点 + 软删除
+	if err := s.repo.DeleteFileByID(ctx, fileID); err != nil {
+		return err
+	}
+	// 4. 删除 MinIO 对象（失败仅记日志，不影响主流程）
+	if err := s.repo.RemoveMinioObject(ctx, file.MinioPath); err != nil {
+		log.Printf("[DeleteFile] RemoveMinioObject failed for fileID=%d path=%s: %v", fileID, file.MinioPath, err)
+	}
+	return nil
 }
 
 // BindFileToNode 将文件绑定到节点

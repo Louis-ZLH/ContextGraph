@@ -66,6 +66,21 @@ export interface getFileInfoResponse {
     contentType: string;
 }
 
+export interface FileListItem {
+    fileId: string;
+    filename: string;
+    fileSize: number;
+    contentType: string;
+    createdAt: string;
+}
+
+export interface FileListResponse {
+    files: FileListItem[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 // 前端传后端的数据格式
 export interface DTONodeReadyToSend {
     id: string;

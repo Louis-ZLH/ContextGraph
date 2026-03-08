@@ -9,6 +9,7 @@ import Canvas from "../view/canvas";
 import { authMiddleware } from "./middleware/auth";
 import { canvasLayoutLoader, canvasLoader } from "./loader/canvas";
 import NewCanvas from "../view/canvas/NewCanvas";
+import MyResource from "../view/canvas/MyResource";
 
 export const router = createBrowserRouter([
   {
@@ -63,7 +64,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "myresource",
-            element: <div>My Resources</div>,
+            element: <MyResource />,
           }
         ],
       },

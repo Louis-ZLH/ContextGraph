@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/luhao/contextGraph/internal/dto"
@@ -20,6 +21,8 @@ type FileService interface {
 	GetFileInfo(ctx context.Context, userID int64, fileID int64) (*model.File, error)
 	DownloadFile(ctx context.Context, userID int64, fileID int64) (*model.File, io.ReadCloser, error)
 	BindFileToNode(ctx context.Context, userID int64, fileID int64, nodeID string) error
+	ListFiles(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error)
+	DeleteFile(ctx context.Context, userID int64, fileID int64) error
 }
 
 type FileHandler struct {
@@ -132,6 +135,84 @@ func (h *FileHandler) GetFileInfo(c *gin.Context) {
 		FileSize:    fileMeta.FileSize,
 		ContentType: fileMeta.ContentType,
 	}))
+}
+
+// ListFiles GET /api/file/list?page=1&limit=20&keyword=xxx
+func (h *FileHandler) ListFiles(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.Error(apperr.BizUnauthorized, "Unauthorized"))
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	keyword := c.Query("keyword")
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	files, total, err := h.fileService.ListFiles(c.Request.Context(), userID.(int64), keyword, page, limit)
+	if err != nil {
+		if appErr, ok := apperr.GetAppError(err); ok {
+			c.JSON(appErr.Code, dto.Error(appErr.BizCode, appErr.Message))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.Error(apperr.BizUnknown, "Internal Server Error"))
+		return
+	}
+
+	items := make([]dto.FileListItem, len(files))
+	for i, f := range files {
+		items[i] = dto.FileListItem{
+			FileID:      f.ID,
+			Filename:    f.Filename,
+			FileSize:    f.FileSize,
+			ContentType: f.ContentType,
+			CreatedAt:   f.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	c.JSON(http.StatusOK, dto.Success(dto.FileListResponse{
+		Files: items,
+		Total: total,
+		Page:  page,
+		Limit: limit,
+	}))
+}
+
+// DeleteFile DELETE /api/file/:id
+func (h *FileHandler) DeleteFile(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.Error(apperr.BizUnauthorized, "Unauthorized"))
+		return
+	}
+
+	fileID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.Error(apperr.BizInvalidParams, "无效的文件ID"))
+		return
+	}
+
+	err = h.fileService.DeleteFile(c.Request.Context(), userID.(int64), fileID)
+	if err != nil {
+		if appErr, ok := apperr.GetAppError(err); ok {
+			c.JSON(appErr.Code, dto.Error(appErr.BizCode, appErr.Message))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.Error(apperr.BizUnknown, "Internal Server Error"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessMsg("文件已删除"))
 }
 
 // BindFileToNode POST /file/bind-node — 将文件绑定到节点

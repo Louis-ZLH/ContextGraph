@@ -749,7 +749,7 @@ func (s *ConversationService) resolveParentContext(
 				}}
 
 			case "resourceNode":
-				if n.FileID == nil {
+				if n.FileID == nil || *n.FileID == -1 {
 					return
 				}
 				fileBlocks, err := s.getResourceNodeContent(ctx, *n.FileID, eventCh)

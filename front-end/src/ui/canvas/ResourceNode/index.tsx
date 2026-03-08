@@ -19,7 +19,10 @@ import { getFileExtLabel } from "./utils";
 function ResourceNode({ id, data, selected }: { id: string; data: NodeData; selected?: boolean }) {
   const dispatch = useDispatch();
   const fileId: string | undefined = data?.fileId ?? undefined;
-  const status = fileId === "__error__" ? "error" : (fileId ? "success" : "uploading");
+  const status = fileId === "__error__" ? "error"
+    : String(fileId) === "-1" ? "deleted"
+    : fileId ? "success"
+    : "uploading";
 
   const { data: fileInfo, isLoading: isFileInfoLoading } = useQuery({
     queryKey: ["fileInfo", fileId],
@@ -189,6 +192,14 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
               </div>
             )}
           </>
+        )}
+
+        {/* 文件已删除 */}
+        {status === "deleted" && (
+          <div className="flex flex-col items-center justify-center py-4 gap-2">
+            <AlertCircle size={22} className="text-secondary" />
+            <p className="text-xs text-secondary">File has been deleted</p>
+          </div>
         )}
 
         {/* 上传失败 */}

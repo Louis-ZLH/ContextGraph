@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -210,6 +211,52 @@ func (r *FileRepo) MinioObjectExists(ctx context.Context, minioPath string) (boo
 		return false, err
 	}
 	return true, nil
+}
+
+// ListFilesByUser 分页查询用户的所有文件，支持按文件名模糊搜索
+func (r *FileRepo) ListFilesByUser(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error) {
+	var files []model.File
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&model.File{}).Where("user_id = ?", userID)
+	if keyword != "" {
+		escaped := strings.ReplaceAll(keyword, "%", "\\%")
+		escaped = strings.ReplaceAll(escaped, "_", "\\_")
+		query = query.Where("filename LIKE ?", "%"+escaped+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, apperr.Wrap(err, 500, apperr.BizUnknown, "查询文件总数失败")
+	}
+
+	offset := (page - 1) * limit
+	if err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&files).Error; err != nil {
+		return nil, 0, apperr.Wrap(err, 500, apperr.BizUnknown, "查询文件列表失败")
+	}
+
+	return files, total, nil
+}
+
+// DeleteFileByID 软删除文件记录 + 将绑定该文件的所有 Node 的 file_id 标记为 -1（已删除）
+func (r *FileRepo) DeleteFileByID(ctx context.Context, fileID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 将所有引用此文件的节点的 file_id 标记为 -1（已删除哨兵值）
+		deletedSentinel := int64(-1)
+		if err := tx.Model(&model.Node{}).Where("file_id = ?", fileID).
+			Update("file_id", deletedSentinel).Error; err != nil {
+			return apperr.Wrap(err, 500, apperr.BizUnknown, "标记节点文件已删除失败")
+		}
+		// 2. 软删除文件记录
+		if err := tx.Delete(&model.File{}, fileID).Error; err != nil {
+			return apperr.Wrap(err, 500, apperr.BizUnknown, "删除文件记录失败")
+		}
+		return nil
+	})
+}
+
+// RemoveMinioObject 删除 MinIO 中的文件对象
+func (r *FileRepo) RemoveMinioObject(ctx context.Context, minioPath string) error {
+	return r.minioClient.RemoveObject(ctx, r.bucket, minioPath, minio.RemoveObjectOptions{})
 }
 
 // ListMinioObjects 列出指定前缀下的所有 MinIO 对象路径（按名称排序）

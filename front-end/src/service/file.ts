@@ -1,6 +1,6 @@
 import type { FileCategory } from "../feature/canvas/canvasSlice";
 import { apiRequest } from "../util/api";
-import type { JSONResponse, uploadFileResponse, getFileInfoResponse } from "./type";
+import type { JSONResponse, uploadFileResponse, getFileInfoResponse, FileListResponse } from "./type";
 import { toCamelCase } from "../util/transform";
 
 // ────────────── 文件类型检测 ──────────────
@@ -136,6 +136,45 @@ export async function getFileInfo(fileId: string): Promise<{ success: boolean, m
       return { success: false, message: error.message, data: null };
     }
     return { success: false, message: "Failed to get file info", data: null };
+  }
+}
+
+export async function getFileList(params: { page?: number; limit?: number; keyword?: string }): Promise<{ success: boolean, message: string, data: FileListResponse | null }> {
+  try {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.keyword) query.set("keyword", params.keyword);
+
+    const response = await apiRequest<JSONResponse>(`/api/file/list?${query.toString()}`, {
+      method: "GET",
+    });
+    if (response.code !== 0) {
+      throw new Error(response.message);
+    }
+    return { success: true, message: response.message, data: toCamelCase(response.data) as FileListResponse };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { success: false, message: error.message, data: null };
+    }
+    return { success: false, message: "Failed to get file list", data: null };
+  }
+}
+
+export async function deleteFile(fileId: string): Promise<{ success: boolean, message: string }> {
+  try {
+    const response = await apiRequest<JSONResponse>(`/api/file/${fileId}`, {
+      method: "DELETE",
+    });
+    if (response.code !== 0) {
+      throw new Error(response.message);
+    }
+    return { success: true, message: response.message };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { success: false, message: error.message };
+    }
+    return { success: false, message: "Failed to delete file" };
   }
 }
 
