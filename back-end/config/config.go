@@ -24,6 +24,12 @@ type Config struct {
 	MinioSecretKey string
 	MinioUseSSL    bool
 	MinioBucket    string
+
+	// RabbitMQ 配置
+	RabbitMQURL string
+
+	// AI Service 配置
+	AIServiceURL string
 }
 
 func Load() *Config {
@@ -52,6 +58,11 @@ func Load() *Config {
 		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "password123"),
 		MinioUseSSL:    getEnv("MINIO_USE_SSL", "false") == "true",
 		MinioBucket:    getEnv("MINIO_BUCKET", "context-graph"),
+
+		// RabbitMQ 配置
+		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:5672/"),
+
+		AIServiceURL: getEnv("AI_SERVICE_URL", "http://localhost:8001"),
 	}
 
 	cfg.RedisDB = 0

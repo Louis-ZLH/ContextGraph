@@ -48,22 +48,12 @@ type Node struct {
 	ID string `json:"id" binding:"required"` // 前端nonode生成
 	Type string `json:"type" binding:"required,oneof=chatNode resourceNode"`
 	Position Pos `json:"position" binding:"required"`
-	Data NodeData `json:"data"`
+	FileID *int64 `json:"file_id,string,omitempty"` // 关联的文件ID，外键
 }
 
 type Pos struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
-}
-
-type NodeData struct {
-	ResourceUrl  *string `json:"resourceUrl,omitempty"`
-	UploadStatus *string `json:"uploadStatus,omitempty"` // "uploading" | "success" | "error"
-	FileName     *string `json:"fileName,omitempty"`
-	FileType     *string `json:"fileType,omitempty"`
-	MimeType     *string `json:"mimeType,omitempty"`
-	FileSize     *int64  `json:"fileSize,omitempty"`
-	Extra map[string]interface{} `json:"extra,omitempty"`
 }
 
 type Edge struct {
@@ -74,11 +64,11 @@ type Edge struct {
 }
 
 type SyncCanvasRequest struct {
-    UpdatedNodes   []Node   `json:"updatedNodes" binding:"required"`
-    CreatedNodes   []Node   `json:"createdNodes" binding:"required"`
-    DeletedNodesId []string `json:"deletedNodesId" binding:"required"`
-    CreatedEdges   []Edge   `json:"createdEdges" binding:"required"`
-    DeletedEdgesId []string `json:"deletedEdgesId" binding:"required"`
+    UpdatedNodes   []Node   `json:"updatedNodes"`
+    CreatedNodes   []Node   `json:"createdNodes"`
+    DeletedNodesId []string `json:"deletedNodesId"`
+    CreatedEdges   []Edge   `json:"createdEdges"`
+    DeletedEdges   []Edge   `json:"deletedEdges"`
     ClientVersion  int64    `json:"clientVersion" binding:"required"` // 客户端版本号（乐观锁）
 }
 
@@ -97,9 +87,9 @@ type SyncStats struct {
 }
 
 type FullSyncCanvasRequest struct {
-	CanvasID int64 `json:"canvas_id,string" binding:"required"`
-	Nodes []Node `json:"nodes" binding:"required"`
-	Edges []Edge `json:"edges" binding:"required"`
+	CanvasID int64 `json:"canvas_id,string"`
+	Nodes []Node `json:"nodes"`
+	Edges []Edge `json:"edges"`
 	ClientVersion  int64    `json:"clientVersion" binding:"required"` // 客户端版本号（乐观锁）
 }
 

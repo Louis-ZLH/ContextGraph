@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -22,6 +22,7 @@ type CanvasService interface {
 	SyncCanvas(ctx context.Context, canvasID int64, userID int64, delta dto.SyncCanvasRequest) (dto.SyncCanvasResponse, error)
 	FullSyncCanvas(ctx context.Context, canvasID int64, userID int64, delta dto.FullSyncCanvasRequest) (dto.FullSyncCanvasResponse, error)
 	GetCanvasVersion(ctx context.Context, canvasID int64, userID int64) (int64, error)
+	ListCanvasConversations(ctx context.Context, canvasID int64, userID int64) ([]model.Conversation, error)
 }
 
 type CanvasHandler struct {
@@ -172,11 +173,6 @@ func (h *CanvasHandler) GetCanvasDetail(c *gin.Context){
 
 	var dtoNodes = make([]dto.Node, 0, len(nodes))
 	for _, node := range nodes {
-		var nodeData dto.NodeData
-		if err := json.Unmarshal(node.ResourceData, &nodeData); err != nil {
-			c.JSON(http.StatusInternalServerError, dto.Error(apperr.BizUnknown, "Internal Server Error"))
-			return
-		}
 		dtoNodes = append(dtoNodes, dto.Node{
 			ID: node.ID,
 			Type: node.NodeType,
@@ -184,7 +180,7 @@ func (h *CanvasHandler) GetCanvasDetail(c *gin.Context){
 				X: node.PosX,
 				Y: node.PosY,
 			},
-			Data: nodeData,
+			FileID: node.FileID,
 		})
 	}
 	var dtoEdges = make([]dto.Edge, 0, len(edges))
@@ -221,6 +217,7 @@ func (h *CanvasHandler) SyncCanvas(c *gin.Context) {
 
 	var req dto.SyncCanvasRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[SyncCanvas] ShouldBindJSON failed: %v", err)
 		c.JSON(http.StatusBadRequest, dto.Error(apperr.BizInvalidParams, "Invalid request body"))
 		return
 	}
@@ -297,5 +294,47 @@ func (h *CanvasHandler) GetCanvasVersion(c *gin.Context) {
 
     c.JSON(http.StatusOK, dto.Success(dto.GetCanvasVersionResponse{
 		Version: version,
+	}))
+}
+
+func (h *CanvasHandler) ListCanvasConversations(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.Error(apperr.BizUnauthorized, "Unauthorized"))
+		return
+	}
+
+	canvasIDStr := c.Param("id")
+	canvasID, err := strconv.ParseInt(canvasIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.Error(apperr.BizInvalidParams, "Invalid canvas ID"))
+		return
+	}
+
+	conversations, err := h.canvasService.ListCanvasConversations(c.Request.Context(), canvasID, userID.(int64))
+	if err != nil {
+		if appErr, ok := apperr.GetAppError(err); ok {
+			c.JSON(appErr.Code, dto.Error(appErr.BizCode, appErr.Message))
+			return
+		}
+		c.JSON(500, dto.Error(apperr.BizUnknown, "Internal Server Error"))
+		return
+	}
+	
+	dtoConversations := make([]dto.Conversation, len(conversations))
+	for i, conv := range conversations {
+		dtoConversations[i] = dto.Conversation{
+			ID: conv.ID,
+			CanvasID: conv.CanvasID,
+			Title: conv.Title,
+			RootMessageID: conv.RootMessageID,
+			CurrentLeafID: conv.CurrentLeafID,
+			CreatedAt: conv.CreatedAt,
+			UpdatedAt: conv.UpdatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, dto.Success(dto.ListCanvasConversationsResponse{
+		Conversations: dtoConversations,
 	}))
 }

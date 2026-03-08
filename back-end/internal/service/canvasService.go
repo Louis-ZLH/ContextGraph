@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/luhao/contextGraph/internal/dto"
@@ -23,6 +22,8 @@ type canvasRepo interface {
 	SyncCanvasInTransaction(ctx context.Context, canvasID int64, clientVersion int64, updatedNodes, createdNodes []model.Node, deletedNodeIDs []string, createdEdges []model.NodeEdge, deletedEdgeIDs []string) (time.Time, int64, error)
 	FullSyncCanvasInTransaction(ctx context.Context, canvasID int64, clientVersion int64, nodes []model.Node, edges []model.NodeEdge) (time.Time, int64, error)
 	GetCanvasVersion(ctx context.Context, canvasID int64, userID int64) (int64, error)
+	ListCanvasConversations(ctx context.Context, canvasID int64) ([]model.Conversation, error)
+	GetParentNodesByTargetID(ctx context.Context, targetNodeID string) ([]model.Node, error)
 }
 
 type canvasService struct {
@@ -105,9 +106,14 @@ func (s *canvasService) SyncCanvas(ctx context.Context, canvasID int64, userID i
 
 	// 2. 检查是否为空请求（没有任何变更）
 	if s.isEmptyRequest(delta) {
+		version, err := s.canvasRepo.GetCanvasVersion(ctx, canvasID, userID)
+		if err != nil {
+			return dto.SyncCanvasResponse{}, err
+		}
 		return dto.SyncCanvasResponse{
 			UpdatedAt: time.Now(),
 			Stats:     dto.SyncStats{},
+			Version:   version, // 版本不变
 		}, nil
 	}
 
@@ -117,19 +123,19 @@ func (s *canvasService) SyncCanvas(ctx context.Context, canvasID int64, userID i
 	}
 
 	// 4. 转换 DTO 为 Model（数据准备）
-	updatedNodes, err := s.convertDTONodesToModel(delta.UpdatedNodes, canvasID)
-	if err != nil {
-		return dto.SyncCanvasResponse{}, err
-	}
+	updatedNodes := s.convertDTONodesToModel(delta.UpdatedNodes, canvasID)
 
-	createdNodes, err := s.convertDTONodesToModel(delta.CreatedNodes, canvasID)
-	if err != nil {
-		return dto.SyncCanvasResponse{}, err
-	}
+	createdNodes := s.convertDTONodesToModel(delta.CreatedNodes, canvasID)
 
 	createdEdges := s.convertDTOEdgesToModel(delta.CreatedEdges, canvasID)
 
-	// 5. 在事务中执行所有同步操作（带乐观锁版本检查）
+	// 5. 提取被删除边的 ID
+	deletedEdgeIDs := make([]string, 0, len(delta.DeletedEdges))
+	for _, edge := range delta.DeletedEdges {
+		deletedEdgeIDs = append(deletedEdgeIDs, edge.ID)
+	}
+
+	// 6. 在事务中执行所有同步操作（带乐观锁版本检查）
 	updatedAt, newVersion, err := s.canvasRepo.SyncCanvasInTransaction(
 		ctx,
 		canvasID,
@@ -138,13 +144,13 @@ func (s *canvasService) SyncCanvas(ctx context.Context, canvasID int64, userID i
 		createdNodes,
 		delta.DeletedNodesId,
 		createdEdges,
-		delta.DeletedEdgesId,
+		deletedEdgeIDs,
 	)
 	if err != nil {
 		return dto.SyncCanvasResponse{}, err
 	}
 
-	// 6. 返回同步结果（包括新的版本号）
+	// 7. 返回同步结果（包括新的版本号）
 	return dto.SyncCanvasResponse{
 		UpdatedAt: updatedAt,
 		Version:   newVersion,
@@ -153,7 +159,7 @@ func (s *canvasService) SyncCanvas(ctx context.Context, canvasID int64, userID i
 			NodesCreated: len(delta.CreatedNodes),
 			NodesDeleted: len(delta.DeletedNodesId),
 			EdgesCreated: len(delta.CreatedEdges),
-			EdgesDeleted: len(delta.DeletedEdgesId),
+			EdgesDeleted: len(delta.DeletedEdges),
 		},
 	}, nil
 }
@@ -167,10 +173,7 @@ func (s *canvasService) FullSyncCanvas(ctx context.Context, canvasID int64, user
 	}
 
 	// 2. 数据转换
-	nodes, err := s.convertDTONodesToModel(data.Nodes, canvasID)
-	if err != nil {
-		return dto.FullSyncCanvasResponse{}, err
-	}
+	nodes := s.convertDTONodesToModel(data.Nodes, canvasID)
 
 	edges := s.convertDTOEdgesToModel(data.Edges, canvasID)
 
@@ -201,28 +204,40 @@ func (s *canvasService) GetCanvasVersion(ctx context.Context, canvasID int64, us
 	return version, nil
 }
 
+func (s *canvasService) ListCanvasConversations(ctx context.Context, canvasID int64, userID int64) ([]model.Conversation, error) {
+	// 1. 验证用户对画布的访问权限
+	if owned, err := s.canvasRepo.CheckCanvasOwnership(ctx, canvasID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, apperr.Unauthorized("User does not have access to this canvas")
+	}
+
+	conversations, err := s.canvasRepo.ListCanvasConversations(ctx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
+	return conversations, nil
+}
+
 // convertDTONodesToModel 将 DTO 节点转换为 Model 节点
-func (s *canvasService) convertDTONodesToModel(dtoNodes []dto.Node, canvasID int64) ([]model.Node, error) {
+func (s *canvasService) convertDTONodesToModel(dtoNodes []dto.Node, canvasID int64) ([]model.Node) {
 	if len(dtoNodes) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	nodes := make([]model.Node, 0, len(dtoNodes))
 	for _, node := range dtoNodes {
-		resourceDataStr, err := json.Marshal(node.Data)
-		if err != nil {
-			return nil, apperr.InternalError("Failed to marshal node data")
-		}
 		nodes = append(nodes, model.Node{
 			ID:           node.ID,
 			CanvasID:     canvasID,
 			NodeType:     node.Type,
 			PosX:         node.Position.X,
 			PosY:         node.Position.Y,
-			ResourceData: resourceDataStr,
+			FileID:       node.FileID,
 		})
 	}
-	return nodes, nil
+	return nodes
 }
 
 // convertDTOEdgesToModel 将 DTO 边转换为 Model 边
@@ -249,7 +264,7 @@ func (s *canvasService) isEmptyRequest(delta dto.SyncCanvasRequest) bool {
 		len(delta.CreatedNodes) == 0 &&
 		len(delta.DeletedNodesId) == 0 &&
 		len(delta.CreatedEdges) == 0 &&
-		len(delta.DeletedEdgesId) == 0
+		len(delta.DeletedEdges) == 0
 }
 
 // validateSyncRequest 验证同步请求的数据
@@ -281,8 +296,8 @@ func (s *canvasService) validateSyncRequest(delta dto.SyncCanvasRequest) error {
 		}
 	}
 
-	for _, edgeID := range delta.DeletedEdgesId {
-		if edgeID == "" {
+	for _, edge := range delta.DeletedEdges {
+		if edge.ID == "" {
 			return apperr.BadRequest("Edge ID cannot be empty")
 		}
 	}

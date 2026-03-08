@@ -1,6 +1,6 @@
 // 获取环境变量中的 API 基地址
 // 如果没有配置，默认使用空字符串（即当前域名）
-const BASE_URL = import.meta.env.API_BASE_URL || "";
+export const BASE_URL = import.meta.env.API_BASE_URL || "";
 
 export class ApiError extends Error {
   status: number;
@@ -21,11 +21,15 @@ export async function apiRequest<T>(
   // 确保 endpoint 以 / 开头
   const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`;
 
-  const defaultHeaders = {
-    "Content-Type": "application/json",
+  const defaultHeaders: Record<string, string> = {
     // 这里可以统一添加 Token
     // "Authorization": `Bearer ${localStorage.getItem('token')}`
   };
+
+  // FormData 需要浏览器自动设置 Content-Type（带 boundary），不能手动指定
+  if (!(options.body instanceof FormData)) {
+    defaultHeaders["Content-Type"] = "application/json";
+  }
 
   const config = {
     ...options,

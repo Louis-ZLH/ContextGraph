@@ -48,6 +48,14 @@ export const router = createBrowserRouter([
             path: ":canvas_id",
             loader: canvasLoader,
             element: <Canvas />,
+            shouldRevalidate: ({ currentUrl, nextUrl, defaultShouldRevalidate }) => {
+              // 如果前后的 URL 路径完全一致，则返回 false（不重新运行 loader）
+              if (currentUrl.pathname === nextUrl.pathname) {
+                return false;
+              }
+              // 否则走默认的重新验证逻辑
+              return defaultShouldRevalidate;
+            },
           },
           {
             path: "search",

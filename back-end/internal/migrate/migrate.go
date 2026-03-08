@@ -12,8 +12,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.Node{},
 		&model.NodeEdge{},
 		&model.Message{},
-		&model.Summary{},
 		&model.AiModel{},
 		&model.TokenUsageLog{},
+		&model.File{},
+		&model.Conversation{},
 	)
 }

@@ -20,7 +20,8 @@ func NewRouter(a *app.App) *gin.Engine {
 	NewAuthRouter(api, a)
 	NewUserRouter(api, a)
 	NewCanvasRouter(api, a)
-
+	NewFileRouter(api, a)
+	NewChatRouter(api,a)
 
 	return r
 }

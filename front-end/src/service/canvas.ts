@@ -5,7 +5,8 @@ import { toCamelCase } from "../util/transform";
 import type { Canvas, CanvasDetail, syncResponse, fullSyncResponse } from "./type";
 import type { GraphDelta } from "../feature/canvas/types";
 import type { Node, Edge } from "../feature/canvas/types";
-import type { getCanvasVersionResponse } from "./type";
+import type { getCanvasVersionResponse, BackendNode, DTONodeReadyToSend } from "./type";
+import type { Conversation } from "../feature/chat/types";
 
 export async function createCanvas(): Promise<{ success: boolean, message: string, data: Canvas | null }> {
     try{
@@ -101,9 +102,16 @@ export async function getCanvasDetail(canvasId: string): Promise<{ success: bool
 
 export async function syncCanvas(canvasId: string, delta: GraphDelta, version: number): Promise<{ success: boolean, message: string, data: syncResponse | null, code: number }> {
     try{
+        const deltaToSend = {
+            updatedNodes: delta.updatedNodes.map(convertNodeToSendStructure),
+            createdNodes: delta.createdNodes.map(convertNodeToSendStructure),
+            deletedNodesId: delta.deletedNodesId,
+            createdEdges: delta.createdEdges,
+            deletedEdges: delta.deletedEdges,
+        };
         const response = await apiRequest<JSONResponse>(`/api/canvas/${canvasId}/sync`, {
             method: "POST",
-            body: JSON.stringify({ ...delta, clientVersion:version }),
+            body: JSON.stringify({ ...deltaToSend, clientVersion:version }),
         });
 
         if(response.code !== 0) {
@@ -128,9 +136,10 @@ export async function fullSyncCanvas(
     version: number
 ): Promise<{ success: boolean, message: string, data: fullSyncResponse | null, code: number }> {
     try{
+        const nodesToSend = nodes.map(convertNodeToSendStructure);
         const response = await apiRequest<JSONResponse>(`/api/canvas/${canvasId}/full-sync`, {
             method: "POST",
-            body: JSON.stringify({ canvas_id: canvasId, nodes, edges, clientVersion:version }),
+            body: JSON.stringify({ canvas_id: canvasId, nodes: nodesToSend, edges, clientVersion:version }),
         });
         if(response.code !== 0) {
             return { success: false, message: response.message, data: null, code: 0 };
@@ -161,5 +170,43 @@ export async function getCanvasVersion(canvasId: string): Promise<{ success: boo
             return { success: false, message: error.message || "Failed to get canvas version", data: null };
         }
         return { success: false, message: "Failed to get canvas version", data: null };
+    }
+}
+
+export function convertNodeToSendStructure(node: Node): DTONodeReadyToSend {
+    const fileId = node.data.fileId;
+    return {
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        file_id: fileId && fileId !== "__error__" ? fileId : undefined,
+    };
+}
+
+export function convertBackendNodeToNode(node: BackendNode): Node {
+    return {
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        data: {
+            fileId: node.fileId,
+        },
+    };
+}
+
+export async function getConversationList(canvasId: string): Promise<{ success: boolean, message: string, data: Conversation[] | null }> {
+    try{
+        const response = await apiRequest<JSONResponse>(`/api/canvas/${canvasId}/conversation/list`, {
+            method: "GET",
+        });
+        if(response.code !== 0) {
+            return { success: false, message: response.message, data: null };
+        }
+        return { success: true, message: response.message, data: toCamelCase(response.data?.conversations) as Conversation[] };
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            return { success: false, message: error.message || "Failed to get conversation list", data: null };
+        }
+        return { success: false, message: "Failed to get conversation list", data: null };
     }
 }

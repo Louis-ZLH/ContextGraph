@@ -34,8 +34,8 @@ services:
       - "5672:5672"  # 核心协议端口
       - "15672:15672" # 管理后台端口 (访问 http://localhost:15672)
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: superAdmin
+      RABBITMQ_DEFAULT_PASS: Zlh1024@
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
@@ -65,8 +65,29 @@ services:
   #   depends_on:
   #     - back-end # 确保后端先启动
 
+  # 5. AI Service (Python FastAPI)
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: cg-ai-service
+    restart: always
+    ports:
+      - "8001:8001"
+    depends_on:
+      - minio
+      - rabbitmq
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password123
+      MINIO_BUCKET: context-graph
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-xxx}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+
   back-end:
-    build: 
+    build:
       context: ../back-end  # 指向后端代码所在的文件夹
       dockerfile: Dockerfile
     container_name: back-end
@@ -76,15 +97,17 @@ services:
     depends_on:
       - mysql        # 确保数据库先启动
       - redis        # 确保 Redis 先启动
-    # 如果你的 Go 代码支持读取环境变量来覆盖 config，可以在这里配置
-    # 如果不支持，你需要修改 config.yaml 里的 host 为服务名
+      - rabbitmq     # 确保 RabbitMQ 先启动
+      - ai-service   # 确保 AI 服务先启动
     environment:
-      APP_ENV: dev # 示例环境变量
+      APP_ENV: dev
       HTTP_ADDR: :8080
       MYSQL_DSN: root:root@tcp(mysql:3306)/context_graph?charset=utf8mb4&parseTime=True&loc=Local
       REDIS_ADDR: redis:6379
-      RABBITMQ_ADDR: rabbitmq:5672
       REDIS_PASSWORD: ""
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      AI_SERVICE_URL: http://ai-service:8001
+      MINIO_ENDPOINT: minio:9000
 
 
 # 定义数据卷 (让数据持久化，重启容器数据不丢)

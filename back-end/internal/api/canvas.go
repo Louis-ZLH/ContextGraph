@@ -20,4 +20,6 @@ func NewCanvasRouter(api *gin.RouterGroup, a *app.App) {
 	canvasApi.POST("/:id/sync", a.H.CanvasHandler.SyncCanvas)
 	canvasApi.POST("/:id/full-sync", a.H.CanvasHandler.FullSyncCanvas) //Sync失败三次后，前端会调用全量同步接口保底
 	canvasApi.GET("/:id/version", a.H.CanvasHandler.GetCanvasVersion) // 获取画布版本号接口，供前端重新聚焦使用
+
+	canvasApi.GET("/:id/conversation/list", a.H.CanvasHandler.ListCanvasConversations)
 }

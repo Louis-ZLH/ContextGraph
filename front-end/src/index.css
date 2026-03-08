@@ -117,7 +117,7 @@
   --bg-sidebar: #020617;
   --bg-header: rgba(15, 23, 42, 0.8);
   --bg-canvas: #0b1120;
-  --border-main: #1e293b;
+  --border-main: #334155;
 
   --text-primary: #e2e8f0;
   --text-secondary: #64748b;
@@ -215,6 +215,10 @@ body {
   border: 1px solid var(--border-main);
 }
 
+.node-selected {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .source-header {
   border-left: 3px solid var(--accent);
 }
@@ -233,10 +237,85 @@ body {
   color: var(--accent);
 }
 
+/* ── Source Node: Loading State (Skeleton Shimmer) ── */
+.source-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-main) 25%,
+    var(--bg-canvas) 50%,
+    var(--border-main) 75%
+  );
+  background-size: 200% 100%;
+  animation: source-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes source-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.source-skeleton-wrapper {
+  animation: source-skeleton-fade-in 0.3s ease-out;
+}
+
+@keyframes source-skeleton-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Source Node: Loading Tag (Bouncing Dots) ── */
+.source-loading-tag {
+  background-color: var(--bg-canvas);
+  color: var(--text-secondary);
+}
+
+.source-loading-dots {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.source-loading-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  animation: source-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.source-loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.source-loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes source-dot-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
 /* ============ Handle Styles ============ */
 .custom-handle {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 2px solid white;
   transition:
@@ -248,22 +327,151 @@ body {
   transform: scale(1.4);
 }
 
+/* ── Source Handle ── */
 .custom-handle-source {
   background-color: var(--accent);
   cursor: crosshair;
 }
 
-.custom-handle-source:hover {
-  box-shadow: 0 0 6px var(--accent);
+.custom-handle-source::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  animation: handle-pulse 2.2s ease-in-out infinite;
+  pointer-events: none;
 }
 
+.custom-handle-source::after {
+  content: "Drag →";
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: white;
+  background: var(--accent);
+  padding: 3px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.custom-handle-source:hover {
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.custom-handle-source:hover::before {
+  animation: none;
+  opacity: 0;
+}
+
+.custom-handle-source:hover::after {
+  opacity: 1;
+}
+
+@keyframes handle-pulse {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.4);
+  }
+}
+
+/* ── Target Handle ── */
 .custom-handle-target {
   background-color: #9ca3af;
   cursor: cell;
 }
 
+.custom-handle-target::after {
+  content: "← Drop";
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: white;
+  background: #6b7280;
+  padding: 3px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
 .custom-handle-target:hover {
-  box-shadow: 0 0 6px #9ca3af;
+  box-shadow: 0 0 10px #9ca3af;
+}
+
+.custom-handle-target:hover::after {
+  opacity: 1;
+}
+
+/* ============ Streaming Fade-in ============ */
+.streaming-content :is(p, h1, h2, h3, h4, h5, h6, ul, ol, pre, blockquote, hr, table) {
+  animation: stream-fade-in 0.4s ease-out;
+}
+
+@keyframes stream-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============ Sparkles Active Ring ============ */
+.sparkles-active {
+  position: relative;
+  animation: sparkles-glow 2s ease-in-out infinite;
+}
+
+.sparkles-active::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  animation: sparkles-ring 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes sparkles-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  70%  { transform: scale(1.6); opacity: 0;   }
+  100% { transform: scale(1.6); opacity: 0;   }
+}
+
+@keyframes sparkles-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 6px 1px var(--accent); }
+}
+
+/* ============ Status Wave (waiting → summarizing → thinking) ============ */
+.status-char-wave {
+  display: inline-block;
+  animation: status-wave 0.1s ease-in-out forwards;
+}
+
+@keyframes status-wave {
+  0%   { transform: translateY(0);    opacity: 1;   }
+  30%  { transform: translateY(-4px); opacity: 0.6; }
+  60%  { transform: translateY(1px);  opacity: 0.85; }
+  100% { transform: translateY(0);    opacity: 1;   }
 }
 
 /* ============ Scrollbar ============ */

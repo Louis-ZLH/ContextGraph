@@ -1,4 +1,4 @@
-import { type DragEvent, useCallback } from "react";
+import { type DragEvent, useCallback, useRef } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -6,16 +6,19 @@ import {
   MiniMap,
   Panel,
 } from "@xyflow/react";
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquarePlus, FileUp } from "lucide-react";
 import type { ThemeName } from "../../feature/user/userSlice";
 
 interface CanvasControlsProps {
   onLayout: (direction: "TB" | "LR") => void;
   onAddNode: (type: "chatNode") => void;
+  onUploadFile: (files: File[]) => void;
   theme: ThemeName;
 }
 
-export function CanvasControls({ onLayout, onAddNode, theme }: CanvasControlsProps) {
+export function CanvasControls({ onLayout, onAddNode, onUploadFile, theme }: CanvasControlsProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const onDragStart = useCallback(
     (event: DragEvent, nodeType: "chatNode") => {
       event.dataTransfer.setData("application/reactflow", nodeType);
@@ -71,6 +74,28 @@ export function CanvasControls({ onLayout, onAddNode, theme }: CanvasControlsPro
           >
             <MessageSquarePlus size={14} />
             Chat
+          </button>
+
+          {/* 上传文件按钮 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.docx,.xlsx,.pptx,.csv,.json"
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) onUploadFile(files);
+              e.target.value = "";
+            }}
+          />
+          <button
+            className={btnClass + " flex items-center gap-1.5"}
+            onClick={() => fileInputRef.current?.click()}
+            title="上传文件并创建 Resource 节点"
+          >
+            <FileUp size={14} />
+            Upload
           </button>
         </div>
       </Panel>

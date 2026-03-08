@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useAppSelector, useAppDispatch } from "../../hooks";
 import {
   consumeDelta,
   syncSuccess,
@@ -9,10 +9,9 @@ import {
   fullSyncDone,
   type GraphDelta,
 } from "./canvasSlice";
-import { syncCanvas, fullSyncCanvas, getCanvasDetail, getCanvasVersion } from "../../service/canvas";
+import { syncCanvas, fullSyncCanvas, getCanvasDetail, getCanvasVersion, convertBackendNodeToNode } from "../../service/canvas";
 import toast from "react-hot-toast";
 import type { syncResponse } from "../../service/type";
-import type { Node, Edge } from "./types";
 
 function isDeltaEmpty(d: GraphDelta) {
   return (
@@ -20,34 +19,34 @@ function isDeltaEmpty(d: GraphDelta) {
     d.updatedNodes.length === 0 &&
     d.deletedNodesId.length === 0 &&
     d.createdEdges.length === 0 &&
-    d.deletedEdgesId.length === 0
+    d.deletedEdges.length === 0
   );
 }
 
-export function useSyncCanvas() {
-  const dispatch = useDispatch();
+// Module-level: track the in-flight sync promise so the loader can await it
+// eslint-disable-next-line prefer-const
+let inflightSyncPromise: Promise<void> | null = null;
+export function getInflightSyncPromise() {
+  return inflightSyncPromise;
+}
 
-  // @ts-expect-error state type
-  const pendingDelta: GraphDelta = useSelector((s) => s.canvas.pendingDelta);
-  // @ts-expect-error state type
-  const syncStatus: string = useSelector((s) => s.canvas.syncStatus);
-  // @ts-expect-error state type
-  const syncFailCount: number = useSelector((s) => s.canvas.syncFailCount);
-  // @ts-expect-error state type
-  const canvasId: string | null = useSelector((s) => s.canvas.canvasId);
-  // @ts-expect-error state type
-  const version: number = useSelector((s) => s.canvas.version);
-  // @ts-expect-error state type
-  const nodes: Node[] = useSelector((s) => s.canvas.nodes);
-  // @ts-expect-error state type
-  const edges: Edge[] = useSelector((s) => s.canvas.edges);
+export function useSyncCanvas() {
+  const dispatch = useAppDispatch();
+
+  const pendingDelta = useAppSelector((s) => s.canvas.pendingDelta);
+  const syncStatus = useAppSelector((s) => s.canvas.syncStatus);
+  const syncFailCount = useAppSelector((s) => s.canvas.syncFailCount);
+  const canvasId = useAppSelector((s) => s.canvas.canvasId);
+  const version = useAppSelector((s) => s.canvas.version);
+  const nodes = useAppSelector((s) => s.canvas.nodes);
+  const edges = useAppSelector((s) => s.canvas.edges);
   // ---- 从后端拉取最新数据替换本地 ----
   const fetchAndReplace = useCallback(async (cid: string) => {
     dispatch(startFullSync());
     try {
       const { success, data } = await getCanvasDetail(cid);
       if (!success || !data) throw new Error("Failed to fetch canvas");
-      dispatch(replaceFromServer({ nodes: data.nodes, edges: data.edges, version: data.version }));
+      dispatch(replaceFromServer({ nodes: data.nodes.map(convertBackendNodeToNode), edges: data.edges, version: data.version }));
     } catch {
       toast.error("Failed to fetch latest canvas from server");
       dispatch(fullSyncDone({ version, updatedAt: "" }));
@@ -101,7 +100,7 @@ export function useSyncCanvas() {
   // Flush pending delta on unmount (e.g. route change) to avoid data loss
   useEffect(() => {
     return () => {
-      doSyncRef.current();
+      inflightSyncPromise = doSyncRef.current();
     };
   }, []);
 

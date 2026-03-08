@@ -15,20 +15,22 @@ docker-compose.override.yml
 *.pem
 *.key
 
+# --- Node.js (全局) ---
+node_modules/
+
 # --- Backend (Go) ---
-/backend/vendor/
-/backend/bin/
-/backend/dist/
-/backend/*.exe
-/backend/*.test
-/backend/coverage.txt
+/back-end/vendor/
+/back-end/bin/
+/back-end/dist/
+/back-end/*.exe
+/back-end/*.test
+/back-end/coverage.txt
 
 # --- Frontend (Node.js/React) ---
-/frontend/node_modules/
-/frontend/dist/
-/frontend/build/
-/frontend/.npm/
-/frontend/*.local
+/front-end/dist/
+/front-end/build/
+/front-end/.npm/
+/front-end/*.local
 
 # --- AI Service (Python) ---
 /ai-service/__pycache__/

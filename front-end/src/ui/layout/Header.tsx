@@ -2,7 +2,7 @@ import { Sun, Terminal, ScrollText } from "lucide-react";
 import { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { useLocation } from "react-router";
-
+import type { Conversation } from "../../feature/chat/types";
 export type ThemeName = "saas" | "cyber" | "paper";
 
 interface HeaderProps {
@@ -26,9 +26,11 @@ export function Header({ theme, onSetTheme }: HeaderProps) {
         return canvasTitle;
     }
   }, [pathname, canvasTitle]);
+  const maximizedNodeId = useSelector((state: {canvas: {maximizedNodeId: string | null}}) => state.canvas.maximizedNodeId);
+  const chatTitle = useSelector((state: {chat: {conversations: Record<string, Conversation>}}) => maximizedNodeId ? state.chat.conversations[maximizedNodeId]?.title : null);
 
   return (
-    <header className="h-14 border-b border-main bg-header flex items-center justify-between px-4 z-10">
+    <header className="h-14 border-b border-main bg-header flex items-center justify-between px-4 z-10 relative">
       <div className="flex flex-col">
         <div className="flex items-center gap-2 text-secondary text-xs">
           <span>Workspace</span>
@@ -41,6 +43,14 @@ export function Header({ theme, onSetTheme }: HeaderProps) {
           {title}
         </h1>
       </div>
+
+      {chatTitle && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-medium truncate max-w-[40%] text-center"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {chatTitle}
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         {/* Theme switcher */}

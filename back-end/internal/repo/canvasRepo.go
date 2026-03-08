@@ -145,10 +145,16 @@ func (r *canvasRepo) SyncCanvasInTransaction(
 			return apperr.Conflict("Canvas has been modified elsewhere")
 		}
 
-		// 1. 更新节点
+		// 1. 更新节点（使用 map 避免 GORM 跳过零值字段）
 		if len(updatedNodes) > 0 {
 			for _, node := range updatedNodes {
-				if err := tx.Model(&model.Node{}).Where("id = ?", node.ID).Updates(node).Error; err != nil {
+				updates := map[string]interface{}{
+					"node_type": node.NodeType,
+					"pos_x":     node.PosX,
+					"pos_y":     node.PosY,
+					"file_id":   node.FileID,
+				}
+				if err := tx.Model(&model.Node{}).Where("id = ?", node.ID).Updates(updates).Error; err != nil {
 					return apperr.InternalError("Failed to update canvas nodes")
 				}
 			}
@@ -158,14 +164,10 @@ func (r *canvasRepo) SyncCanvasInTransaction(
 		if len(createdNodes) > 0 {
 		result := tx.Create(&createdNodes)
 		if result.Error != nil {
-			fmt.Printf("Create nodes error: %v\n", result.Error)  // 添加日志
 			if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 				return apperr.BadRequest("Node ID already exists, please retry")
 			}
 			return apperr.InternalError("Failed to create canvas nodes")
-		}
-		if result.RowsAffected == 0 {
-			fmt.Printf("Create nodes: rows affected = 0\n")  // 添加日志
 		}
 		}
 
@@ -305,6 +307,33 @@ func (r *canvasRepo) GetCanvasVersion(ctx context.Context, canvasID int64, userI
 		return 0, apperr.InternalError("Internal error while getting canvas version")
 	}
 	return canvas.Version, nil
+}
+
+func (r *canvasRepo) ListCanvasConversations(ctx context.Context, canvasID int64) ([]model.Conversation, error) {
+    var conversations []model.Conversation
+    err := r.db.WithContext(ctx).
+        Model(&model.Conversation{}).
+        Joins("INNER JOIN nodes n ON n.id = conversations.id AND n.deleted_at IS NULL").
+        Where("conversations.canvas_id = ?", canvasID).
+        Find(&conversations).Error
+    if err != nil {
+        return nil, err
+    }
+	// 没找到返回空数组
+    return conversations, nil
+}
+
+// GetParentNodesByTargetID 通过 node_edges 查询指定节点的所有父节点
+func (r *canvasRepo) GetParentNodesByTargetID(ctx context.Context, targetNodeID string) ([]model.Node, error) {
+	var nodes []model.Node
+	err := r.db.WithContext(ctx).
+		Joins("INNER JOIN node_edges ON node_edges.source_node_id = nodes.id").
+		Where("node_edges.target_node_id = ?", targetNodeID).
+		Find(&nodes).Error
+	if err != nil {
+		return nil, apperr.InternalError("Internal error while getting parent nodes")
+	}
+	return nodes, nil
 }
 
 // generateUniqueCanvasTitle 根据已有标题生成唯一的 "Untitled Canvas" 标题

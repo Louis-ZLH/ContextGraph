@@ -1,4 +1,4 @@
-import type { Node, Edge } from "../feature/canvas/types";
+import type { Edge } from "../feature/canvas/types";
 export type User = {
     userId: string;
     username: string;
@@ -27,7 +27,7 @@ export interface Canvas {
 export interface CanvasDetail {
     canvasId: string;
     title: string;
-    nodes: Node[];
+    nodes: BackendNode[];
     edges: Edge[];
     version: number; // 当前版本号，用于乐观更新
 }
@@ -53,4 +53,31 @@ export interface fullSyncResponse {
 
 export interface getCanvasVersionResponse {
     version: number;
+}
+
+export interface uploadFileResponse {
+    fileId: string;
+}
+
+export interface getFileInfoResponse {
+    fileId: string;
+    filename: string;
+    fileSize: number;
+    contentType: string;
+}
+
+// 前端传后端的数据格式
+export interface DTONodeReadyToSend {
+    id: string;
+    type: "chatNode" | "resourceNode";
+    position: { x: number; y: number };
+    file_id?: string;
+}
+
+// 后端传前端，驼峰化之后的数据格式
+export interface BackendNode {
+    id: string;
+    type: "chatNode" | "resourceNode";
+    position: { x: number; y: number };
+    fileId?: string;
 }

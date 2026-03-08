@@ -23,6 +23,8 @@ type App struct {
 	DB    *gorm.DB
 	RDB   *redis.Client
 	Minio *minio.Client
+	MQ    *infra.RabbitMQ
+	AI    *infra.AIClient
 
 	H *Handlers
 }
@@ -62,8 +64,9 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// 4. migrate
-	if err := migrate.AutoMigrate(db); err != nil {
+	// 4. RabbitMQ
+	mq, err := infra.NewRabbitMQ(cfg.RabbitMQURL)
+	if err != nil {
 		if rdb != nil {
 			_ = rdb.Close()
 		}
@@ -73,24 +76,38 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// 4. 初始化 Snowflake
+	// 5. migrate
+	if err := migrate.AutoMigrate(db); err != nil {
+		mq.Close()
+		if rdb != nil {
+			_ = rdb.Close()
+		}
+		if sqlDB, e := db.DB(); e == nil {
+			_ = sqlDB.Close()
+		}
+		return nil, err
+	}
+
+	// 6. 初始化 Snowflake
 	idgen.InitSnowflake(cfg.MachineID)
 
-	// 5. 初始化 JWT Secret
-	// 假设在 config 中有 JWTSecret 字段
-	// 你可以根据你的实际配置结构进行调整
+	// 7. 初始化 JWT Secret
 	utils.InitJWTSecret(cfg.JWTSecret)
 
-	// 6. 初始化 Bloom Filter
+	// 8. 初始化 Bloom Filter
 	InitBloomFilter(context.Background(), rdb, db)
 
+	// 9. AI Service Client
+	aiClient := infra.NewAIClient(cfg.AIServiceURL)
 
 	return &App{
 		Cfg:   cfg,
 		DB:    db,
 		RDB:   rdb,
 		Minio: minioClient,
-		H:     wireHandlers(db, rdb, minioClient, cfg),
+		MQ:    mq,
+		AI:    aiClient,
+		H:     wireHandlers(db, rdb, minioClient, mq, aiClient, cfg),
 	}, nil
 }
 
@@ -105,6 +122,10 @@ func (a *App) Close(ctx context.Context) error {
 	if a.RDB != nil {
 		_ = a.RDB.Close()
 	}
+	// 关闭 rabbitmq
+	if a.MQ != nil {
+		a.MQ.Close()
+	}
 	return nil
 }
 
@@ -112,12 +133,11 @@ type Handlers struct {
 	AuthHandler *handler.AuthHandler
 	UserHandler *handler.UserHandler
 	CanvasHandler *handler.CanvasHandler
+	FileHandler *handler.FileHandler
+	ConversationHandler *handler.ConversationHandler
 }
 
-func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, cfg *config.Config) *Handlers {
-	// MinIO client 和 config 预留给后续 upload handler 使用
-	_ = minioClient
-	_ = cfg
+func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, mq *infra.RabbitMQ, aiClient *infra.AIClient, cfg *config.Config) *Handlers {
 	// Auth
 	userRepo := repo.NewUserRepo(db, rdb)
 	authService := service.NewAuthService(userRepo)
@@ -132,11 +152,23 @@ func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, cfg
 	canvasService := service.NewCanvasService(canvasRepo)
 	canvasHandler := handler.NewCanvasHandler(canvasService)
 
+	// File
+	fileRepo := repo.NewFileRepo(db, rdb, mq, minioClient, cfg.MinioBucket)
+	fileService := service.NewFileService(fileRepo)
+	fileHandler := handler.NewFileHandler(fileService)
+
+	// Chat
+	conversationRepo := repo.NewConversationRepo(db, rdb)
+	conversationService := service.NewConversationService(conversationRepo, canvasRepo, fileRepo, aiClient)
+	conversationHandler := handler.NewConversationHandler(conversationService)
+
 
 	return &Handlers{
 		AuthHandler: authHandler,
 		UserHandler: userHandler,
 		CanvasHandler: canvasHandler,
+		FileHandler: fileHandler,
+		ConversationHandler: conversationHandler,
 	}
 }
 

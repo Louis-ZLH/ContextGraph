@@ -49,6 +49,9 @@ const (
 	BizNotFound   = 4000
 	BizForbidden  = 4001
 	BizConflict   = 4002
+
+	// 流控相关 5000-5999
+	BizTooManyStreams = 5000
 )
 
 // ==================== 构造函数 ====================
@@ -150,6 +153,10 @@ func HashPasswordError() *AppError {
 	return New(http.StatusInternalServerError, BizUnknown, "密码加密错误")
 }
 
+
+func TooManyStreams() *AppError {
+	return New(http.StatusTooManyRequests, BizTooManyStreams, "Too many concurrent streams, please try again later")
+}
 
 // ==================== 判断错误类型 ====================
 

@@ -2,22 +2,14 @@ import type { Node as NodeBase, Edge as EdgeBase } from "@xyflow/react";
 
 export type FileCategory = "image" | "pdf" | "excel" | "document" | "other";
 
-export interface NodeData {
-  // Resource node 相关
-  resourceUrl?: string;
-  uploadStatus?: "uploading" | "success" | "error";
-  fileName?: string;
-  fileType?: FileCategory;
-  mimeType?: string;
-  fileSize?: number;
-  [key: string]: unknown;
+export type NodeData = {
+  fileId?: string; // 关联的文件ID，外键
 }
 
-export interface Node extends NodeBase {
+export interface Node extends NodeBase<NodeData> {
   id: string;
   type: "chatNode" | "resourceNode";
   position: { x: number; y: number };
-  data: NodeData;
 }
 
 export interface Edge extends EdgeBase {
@@ -51,7 +43,7 @@ export interface GraphDelta {
   createdNodes: Node[];
   deletedNodesId: string[];
   createdEdges: Edge[];
-  deletedEdgesId: string[];
+  deletedEdges: Edge[];
   // Node 同id冲突处理：
   // 1. create → update   合并进 createdNodes（新值覆盖）
   // 2. create → delete   从 createdNodes 中删除（抵消）
@@ -61,18 +53,19 @@ export interface GraphDelta {
 
   // Edge 同id冲突处理：
   // 1. create → delete   从 createdEdges 中删除（抵消）
-  // 2. delete → create   从 deletedEdgesId 中删除（抵消）
+  // 2. delete → create   从 deletedEdges 中删除（抵消）
 
   // 级联处理：
   // delete_node 时： 所有关联边 集合为U
   // 1. 处在createdEdges中的边是子集V，需要从createdEdges中删除
-  // 2. 同时将 U-V 加入 deletedEdgesId
+  // 2. 同时将 U-V 加入 deletedEdges
 }
 
 export interface CanvasState {
   canvasId: string | null;
   title: string;
   showControls: boolean;
+  maximizedNodeId: string | null;
 
     // 核心数据
   nodes: Node[];

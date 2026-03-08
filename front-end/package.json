@@ -18,7 +18,9 @@
     "@tanstack/react-query-devtools": "^5.91.2",
     "@types/nprogress": "^0.2.3",
     "@xyflow/react": "^12.10.0",
+    "katex": "^0.16.33",
     "lucide-react": "^0.563.0",
+    "marked": "^17.0.4",
     "nprogress": "^0.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -27,8 +29,11 @@
     "react-redux": "^9.2.0",
     "react-router": "^7.13.0",
     "react-syntax-highlighter": "^16.1.0",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "tailwindcss": "^4.1.18"
+    "remark-math": "^6.0.0",
+    "tailwindcss": "^4.1.18",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -42,6 +47,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.0.18"
   }
 }

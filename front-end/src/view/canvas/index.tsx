@@ -18,7 +18,6 @@ import CustomEdge from "../../ui/canvas/CustomEdge";
 import { CanvasControls } from "../../ui/canvas/CanvasControls";
 import Dagre from "@dagrejs/dagre";
 import { useSelector, useDispatch } from "react-redux";
-import type { ThemeName } from "../../feature/user/userSlice";
 import {
   type Node,
   type Edge,
@@ -28,12 +27,14 @@ import {
   updateNodes,
   deleteNodesAndEdges,
   addNode,
+  deleteNode,
   patchNodeData,
   undo,
   redo,
 } from "../../feature/canvas/canvasSlice";
 import { useSyncCanvas } from "../../feature/canvas/useSyncCanvas";
-import { isFileAccepted, getFileCategory, uploadFile } from "../../service/upload";
+import { isFileAccepted, isOldOfficeFormat, uploadFile } from "../../service/file";
+import type { RootState } from "../../store";
 
 const nodeTypes = {
   chatNode: ChatNode,
@@ -48,14 +49,13 @@ export function LayoutFlowInner() {
   useSyncCanvas();
   const dispatch = useDispatch();
   const { fitView, getNodes, getEdges, screenToFlowPosition, getViewport } = useReactFlow();
-  // @ts-expect-error state type
-  const canvasId: string | null = useSelector((s) => s.canvas.canvasId);
-  // @ts-expect-error state type
-  const { nodes, edges } = useSelector((state) => state.canvas);
 
-  const theme = useSelector((state: { user: { theme: ThemeName } }) => state.user.theme);
-  const showControls = useSelector((state: { canvas: { showControls: boolean } }) => state.canvas.showControls);
-  const isFullSyncing = useSelector((state: { canvas: { isFullSyncing: boolean } }) => state.canvas.isFullSyncing);
+  const canvasId: string | null = useSelector((s: RootState) => s.canvas.canvasId);
+  const { nodes, edges } = useSelector((state: RootState) => state.canvas);
+
+  const theme = useSelector((state: RootState) => state.user.theme);
+  const showControls = useSelector((state: RootState) => state.canvas.showControls);
+  const isFullSyncing = useSelector((state: RootState) => state.canvas.isFullSyncing);
 
   const nodesRef = useRef<Node[]>([]);
 
@@ -86,6 +86,19 @@ export function LayoutFlowInner() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [dispatch, showControls]);
+
+  // ---- 将画布容器尺寸写入 CSS 变量，供子节点动态读取 ----
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      el.style.setProperty("--canvas-w", `${width}px`);
+      el.style.setProperty("--canvas-h", `${height}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // ---- 文件拖入视觉反馈 ----
   const [fileDragActive, setFileDragActive] = useState(false);
@@ -162,7 +175,8 @@ export function LayoutFlowInner() {
         dispatch(updateNodes({ beginNodes, endNodes }));
       }
       window.requestAnimationFrame(() => {
-        fitView();
+        fitView(
+        );
       });
     },
     [getNodes, getEdges, dispatch, fitView],
@@ -267,17 +281,20 @@ export function LayoutFlowInner() {
       if (files.length === 0) return;
 
       // 过滤不支持的文件
+      const oldOffice = files.filter((f) => isOldOfficeFormat(f));
+      if (oldOffice.length > 0) {
+        toast.error("不支持旧版 Office 格式（.doc/.xls/.ppt），请转换为 .docx/.xlsx/.pptx 后重新上传");
+      }
       const accepted = files.filter((f) => isFileAccepted(f));
-      const rejected = files.length - accepted.length;
-      if (rejected > 0) {
-        toast.error(`${rejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
+      const otherRejected = files.length - oldOffice.length - accepted.length;
+      if (otherRejected > 0) {
+        toast.error(`${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
       }
       if (accepted.length === 0) return;
 
       for (let i = 0; i < accepted.length; i++) {
         const file = accepted[i];
         const nodeId = nanoid();
-        const category = getFileCategory(file);
 
         // 多文件时向右下方依次偏移，避免完全重叠
         const position = screenToFlowPosition({
@@ -292,34 +309,38 @@ export function LayoutFlowInner() {
             type: "resourceNode",
             position,
             data: {
-              uploadStatus: "uploading",
-              fileName: file.name,
-              fileType: category,
-              mimeType: file.type,
-              fileSize: file.size,
+              // 什么都不传
             },
           }),
         );
 
         // 异步上传，完成后 patch 节点数据（不进 undo 栈）
-        uploadFile(nodeId, file)
-          .then((url) => {
+        (async () => {
+          try {
+            const { success, message, data } = await uploadFile(file);
+            if (!success || !data) {
+              throw new Error(message);
+            }
+
+            //利用sync完成bindFileIdToNode操作
+            if (!data.fileId) {
+              throw new Error("File ID is missing");
+            }
             dispatch(
               patchNodeData({
                 id: nodeId,
-                data: { uploadStatus: "success", resourceUrl: url },
+                data: { fileId: data.fileId },
               }),
             );
-          })
-          .catch(() => {
-            dispatch(
-              patchNodeData({
-                id: nodeId,
-                data: { uploadStatus: "error" },
-              }),
-            );
-            toast.error(`"${file.name}" upload failed`);
-          });
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              toast.error(error.message);
+            } else {
+              toast.error("Failed to upload file");
+            }
+            dispatch(deleteNode(nodeId));
+          }
+        })();
       }
     },
     [dispatch, screenToFlowPosition],
@@ -346,6 +367,72 @@ export function LayoutFlowInner() {
           data: {},
         }),
       );
+    },
+    [dispatch, getViewport],
+  );
+
+  // ---- 点击上传按钮：在 viewport 中心创建 ResourceNode ----
+  const onUploadFile = useCallback(
+    (files: File[]) => {
+      const oldOffice = files.filter((f) => isOldOfficeFormat(f));
+      if (oldOffice.length > 0) {
+        toast.error("不支持旧版 Office 格式（.doc/.xls/.ppt），请转换为 .docx/.xlsx/.pptx 后重新上传");
+      }
+      const accepted = files.filter((f) => isFileAccepted(f));
+      const otherRejected = files.length - oldOffice.length - accepted.length;
+      if (otherRejected > 0) {
+        toast.error(`${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
+      }
+      if (accepted.length === 0) return;
+
+      const { x, y, zoom } = getViewport();
+      const reactFlowBounds = document.querySelector(".react-flow")?.getBoundingClientRect();
+      if (!reactFlowBounds) return;
+
+      const centerX = -x / zoom + reactFlowBounds.width / 2 / zoom;
+      const centerY = -y / zoom + reactFlowBounds.height / 2 / zoom;
+
+      for (let i = 0; i < accepted.length; i++) {
+        const file = accepted[i];
+        const nodeId = nanoid();
+
+        const offsetX = (Math.random() - 0.5) * 60 + i * 40;
+        const offsetY = (Math.random() - 0.5) * 60 + i * 40;
+
+        dispatch(
+          addNode({
+            id: nodeId,
+            type: "resourceNode",
+            position: { x: centerX + offsetX, y: centerY + offsetY },
+            data: {},
+          }),
+        );
+
+        (async () => {
+          try {
+            const { success, message, data } = await uploadFile(file);
+            if (!success || !data) {
+              throw new Error(message);
+            }
+            if (!data.fileId) {
+              throw new Error("File ID is missing");
+            }
+            dispatch(
+              patchNodeData({
+                id: nodeId,
+                data: { fileId: data.fileId },
+              }),
+            );
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              toast.error(error.message);
+            } else {
+              toast.error("Failed to upload file");
+            }
+            dispatch(deleteNode(nodeId));
+          }
+        })();
+      }
     },
     [dispatch, getViewport],
   );
@@ -391,13 +478,14 @@ export function LayoutFlowInner() {
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onDelete={onDelete}
+        deleteKeyCode={showControls ? ["Backspace", "Delete"] : null}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        minZoom={0.5}
+        minZoom={0.4}
         maxZoom={2}
         fitView={true}
       >
-        {showControls && <CanvasControls onLayout={onLayout} onAddNode={onAddNode} theme={theme} />}
+        {showControls && <CanvasControls onLayout={onLayout} onAddNode={onAddNode} onUploadFile={onUploadFile} theme={theme} />}
       </ReactFlow>
 
       {/* ── Full Sync Loading Overlay ── */}

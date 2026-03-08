@@ -5,7 +5,7 @@ export const emptyDelta = (): GraphDelta => ({
     createdNodes: [],
     deletedNodesId: [],
     createdEdges: [],
-    deletedEdgesId: [],
+    deletedEdges: [],
 });
 
 export function applyOps(state: CanvasState, ops: AtomicOp[]) {
@@ -95,9 +95,9 @@ for (const op of ops) {
         break;
     }
     case "create_edge": {
-        const deletedEdgeIndex = delta.deletedEdgesId.findIndex((id) => id === op.data.id);
+        const deletedEdgeIndex = delta.deletedEdges.findIndex((e) => e.id === op.data.id);
         if (deletedEdgeIndex >= 0) {
-        delta.deletedEdgesId.splice(deletedEdgeIndex, 1); //抵消
+        delta.deletedEdges.splice(deletedEdgeIndex, 1); //抵消
         } else {
         if (!delta.createdEdges.some((e) => e.id === op.data.id)) {
             delta.createdEdges.push(op.data as Edge);
@@ -110,8 +110,8 @@ for (const op of ops) {
         if (createdEdgeIndex >= 0) {
         delta.createdEdges.splice(createdEdgeIndex, 1);
         } else {
-        if (!delta.deletedEdgesId.includes(op.data.id)) {
-            delta.deletedEdgesId.push(op.data.id);
+        if (!delta.deletedEdges.some((e) => e.id === op.data.id)) {
+            delta.deletedEdges.push(op.data as Edge);
         }
         }
         break;
@@ -131,6 +131,34 @@ export function mergeNodeUpdate(delta: GraphDelta, node: Node) {
         delta.updatedNodes = delta.updatedNodes.filter((n) => n.id !== node.id);
     }
     delta.updatedNodes.push(node);
+}
+
+/**
+ * 根据 pendingDelta 快照，计算某个 chatNode 尚未同步到后端的父节点变更。
+ * - newParentNodes:     新增的父节点（完整 Node 对象，用于后端建立关联）
+ * - deletedParentNodeIds: 被删除的父节点 ID 列表
+ */
+export function computeParentDelta(
+  chatNodeId: string,
+  pendingDelta: GraphDelta,
+  nodes: Node[],
+): { newParentNodes: Node[]; deletedParentNodeIds: string[] } {
+  // 新增的指向 chatNode 的边 → source 即为新增父节点
+  const newParentIds = pendingDelta.createdEdges
+    .filter((e) => e.target === chatNodeId)
+    .map((e) => e.source);
+
+  // 删除的指向 chatNode 的边 → source 即为被移除的父节点
+  const deletedParentNodeIds = pendingDelta.deletedEdges
+    .filter((e) => e.target === chatNodeId)
+    .map((e) => e.source);
+
+  // 从当前 nodes 中查找完整节点数据；找不到则跳过（防御性）
+  const newParentNodes = newParentIds
+    .map((id) => nodes.find((n) => n.id === id))
+    .filter((n): n is Node => n !== undefined);
+
+  return { newParentNodes, deletedParentNodeIds };
 }
 
 export function applyCommand(state: CanvasState, cmd: Command) {

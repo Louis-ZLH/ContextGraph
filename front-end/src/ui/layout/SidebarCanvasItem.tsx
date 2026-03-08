@@ -2,7 +2,7 @@ import { Workflow, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import type { Canvas } from "../../service/type";
 import type { ThemeName } from "../../feature/user/userSlice";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import { RenameCanvasModal } from "../canvas/RenameCanvasModal";
 import { DeleteCanvasModal } from "../canvas/DeleteCanvasModal";
@@ -14,7 +14,7 @@ interface SidebarCanvasItemProps {
   isActive: boolean;
 }
 
-export function SidebarCanvasItem({ canvas, theme, isActive }: SidebarCanvasItemProps) {
+export const SidebarCanvasItem = memo(function SidebarCanvasItem({ canvas, theme, isActive }: SidebarCanvasItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -154,18 +154,18 @@ export function SidebarCanvasItem({ canvas, theme, isActive }: SidebarCanvasItem
           )}
         </div>
       </div>
-      <RenameCanvasModal
+      {showRenameModal && <RenameCanvasModal
         isOpen={showRenameModal}
         onClose={() => setShowRenameModal(false)}
         canvasId={canvas.id}
         currentTitle={canvas.title}
-      />
-      <DeleteCanvasModal
+      />}
+      {showDeleteModal && <DeleteCanvasModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         canvasId={canvas.id}
         canvasTitle={canvas.title}
-      />
+      />}
     </>
   );
-}
+});

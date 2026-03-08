@@ -1,0 +1,238 @@
+import { useState, useCallback, useRef, useEffect, useMemo, memo } from "react";
+import { Handle, Position, useReactFlow, type Viewport } from "@xyflow/react";
+import { useSelector, useDispatch } from "react-redux";
+import type { ThemeName } from "../../../feature/user/userSlice";
+import { deleteNode, toggleShowControls, setMaximizedNode, addNodeWithEdge, patchNodeData } from "../../../feature/canvas/canvasSlice";
+import { nanoid } from "@reduxjs/toolkit";
+import { toast } from "react-hot-toast";
+import { isFileAccepted, isOldOfficeFormat, uploadFile } from "../../../service/file";
+import ChatNodeHeader from "./ChatNodeHeader";
+import WelcomeScreen from "./WelcomeScreen";
+import MessageList from "./Message/MessageList";
+import ChatInput from "./ChatInput";
+import ChatNodeLoading from "./ChatNodeLoading";
+import ChatNodeError from "./ChatNodeError";
+import { useConversationLoader } from "../../../feature/chat/useConversationLoader";
+import { makeSelectCurrentThreadIdsByConversationId } from "../../../feature/chat/chatSlice";
+import type { RootState } from "../../../store";
+import { shallowEqual } from "react-redux";
+import { createContext } from "react";
+import { useChatStream } from "../../../feature/chat/useChatStream";
+
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const streamContext = createContext<ReturnType<typeof useChatStream> | null>(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const modelsContext = createContext<{
+  modelIndex: number;
+  changeModelIndex: (index: number) => void;
+}>({
+  modelIndex: 0,
+  changeModelIndex: () => {},
+});
+
+function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
+  const dispatch = useDispatch(); 
+  const [modelIndex, setModelIndex] = useState(0);
+  const modelsContextValue = useMemo(() => ({
+    modelIndex,
+    changeModelIndex: setModelIndex,
+  }), [modelIndex]);
+  const { send, stop, isStreaming, sendSignalRef } = useChatStream(id);
+  const stream = useMemo(() => ({ send, stop, isStreaming, sendSignalRef }), [send, stop, isStreaming, sendSignalRef]);
+  const title = useSelector((state: RootState) => state.chat.conversations[id]?.title);
+  const { isLoading, error } = useConversationLoader(id);
+  // eslint-disable-next-line
+  const selectCurrentThreadIdsByConversationId = useMemo(makeSelectCurrentThreadIdsByConversationId, []);
+  const threadIds = useSelector((state: RootState) => selectCurrentThreadIdsByConversationId(state, id), shallowEqual);
+
+  const { fitView, getViewport, setViewport } = useReactFlow();
+  const [inputValue, setInputValue] = useState("");
+  const theme = useSelector(
+    (state: { user: { theme: ThemeName } }) => state.user.theme,
+  );
+  const showControls = useSelector(
+    (state: { canvas: { showControls: boolean } }) => state.canvas.showControls,
+  );
+  const maximizedNodeId = useSelector(
+    (state: { canvas: { maximizedNodeId: string | null } }) => state.canvas.maximizedNodeId,
+  );
+  const isMaximized = maximizedNodeId === id;
+  const viewportState = useRef<{ x: number; y: number; zoom: number } | null>(
+    null,
+  );
+  const label = title ?? "New Chat";
+
+  useEffect(() => {
+    return () => {
+      if (showControls === false) {
+        dispatch(toggleShowControls(true));
+      }
+    };
+  }, [showControls, dispatch]);
+
+  const handleSizeChange = useCallback(() => {
+    dispatch(toggleShowControls());
+    if (!isMaximized) {
+      viewportState.current = getViewport();
+      dispatch(setMaximizedNode(id));
+      window.requestAnimationFrame(() => {
+        fitView({
+          nodes: [{ id }],
+          padding: -0.1,
+          maxZoom: 1.1,
+          duration: 500,
+        });
+      });
+    } else {
+      dispatch(setMaximizedNode(null));
+      if (viewportState.current) {
+        setViewport(viewportState.current as Viewport, { duration: 500 });
+      }
+      viewportState.current = null;
+    }
+  }, [isMaximized, dispatch, fitView, getViewport, setViewport, id]);
+
+  const nodePosition = useSelector(
+    (state: RootState) => state.canvas.nodes.find((n) => n.id === id)?.position,
+  );
+  const canvasId = useSelector((state: RootState) => state.canvas.canvasId);
+
+  const handleUploadFile = useCallback(
+    (files: File[]) => {
+      const oldOffice = files.filter((f) => isOldOfficeFormat(f));
+      if (oldOffice.length > 0) {
+        toast.error("不支持旧版 Office 格式（.doc/.xls/.ppt），请转换为 .docx/.xlsx/.pptx 后重新上传");
+      }
+      const accepted = files.filter((f) => isFileAccepted(f));
+      const otherRejected = files.length - oldOffice.length - accepted.length;
+      if (otherRejected > 0) {
+        toast.error(`${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
+      }
+      if (accepted.length === 0 || !nodePosition || !canvasId) return;
+
+      // ChatNode: w-[400px], ResourceNode: w-[230px]
+      const RESOURCE_NODE_WIDTH = 230;
+      const GAP = 50;
+
+      for (let i = 0; i < accepted.length; i++) {
+        const file = accepted[i];
+        const nodeId = nanoid();
+
+        // 将 ResourceNode 放在 ChatNode 左侧，留出间距让连线清晰
+        dispatch(addNodeWithEdge({
+          node: {
+            id: nodeId,
+            type: "resourceNode",
+            position: {
+              x: nodePosition.x - RESOURCE_NODE_WIDTH - GAP + i * 30,
+              y: nodePosition.y + i * 80,
+            },
+            data: {},
+          },
+          targetNodeId: id,
+        }));
+
+        // 异步上传，完成后 patch 节点数据
+        (async () => {
+          try {
+            const { success, message, data } = await uploadFile(file);
+            if (!success || !data) {
+              throw new Error(message);
+            }
+            if (!data.fileId) {
+              throw new Error("File ID is missing");
+            }
+            dispatch(patchNodeData({ id: nodeId, data: { fileId: data.fileId } }));
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              toast.error(error.message);
+            } else {
+              toast.error("Failed to upload file");
+            }
+            dispatch(deleteNode(nodeId));
+          }
+        })();
+      }
+    },
+    [dispatch, nodePosition, canvasId, id],
+  );
+
+  const isEmpty = threadIds.length === 0;
+
+  return (
+    <streamContext.Provider value={stream}>
+      <modelsContext.Provider value={modelsContextValue}>
+        <div
+          className={`node-card rounded-xl flex flex-col text-sm ${isMaximized ? "nodrag nopan relative" : "h-[500px] w-[400px]"} ${selected ? "node-selected" : ""}`}
+          style={
+            isMaximized
+              ? {
+                  width: "calc(var(--canvas-w)/1.1 + 10px)",
+                  height: "calc(var(--canvas-h)/1.1 + 10px)",
+                }
+              : undefined
+          }
+        >
+          <ChatNodeHeader
+            label={label}
+            isMaximized={isMaximized}
+            onSizeChange={handleSizeChange}
+            onDelete={() => dispatch(deleteNode(id))}
+          />
+
+          <div className="nodrag nopan nowheel cursor-default flex flex-col flex-1 min-h-0 relative">
+            {isLoading ? (
+              <ChatNodeLoading />
+            ) : error ? (
+              <ChatNodeError message={error} />
+            ) : isEmpty ? (
+              <WelcomeScreen onSuggestionClick={setInputValue}>
+                <ChatInput
+                conversationId={id}
+                inputValue={inputValue}
+                onInputValueChange={setInputValue}
+                isMaximized={isMaximized}
+                isBottom={false}
+                onUploadFile={handleUploadFile}
+              />
+            </WelcomeScreen>
+            ) : (
+              <MessageList
+                threadIds={threadIds}
+                theme={theme}
+                isMaximized={isMaximized}
+              />
+            )}
+
+            {!isLoading && !error && !isEmpty && <ChatInput
+              conversationId={id}
+              inputValue={inputValue}
+              onInputValueChange={setInputValue}
+              isMaximized={isMaximized}
+              isBottom={true}
+              onUploadFile={handleUploadFile}
+            />}
+          </div>
+
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="custom-handle custom-handle-target"
+            style={{ top: 30, left: -8 }}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            className="custom-handle custom-handle-source"
+            style={{ top: 30, right: -8 }}
+          />
+        </div>
+      </modelsContext.Provider>
+    </streamContext.Provider>
+  );
+}
+
+export default memo(ChatNode, (prev, next) =>
+  prev.id === next.id && prev.selected === next.selected
+);

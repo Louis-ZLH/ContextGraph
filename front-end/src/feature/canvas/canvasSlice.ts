@@ -11,6 +11,7 @@ const initialState: CanvasState = {
   canvasId: null,
   title: "",
   showControls: true,
+  maximizedNodeId: null,
   nodes: [],
   edges: [],
   version: 0,
@@ -82,7 +83,7 @@ const canvasSlice = createSlice({
       state.version = version;
     },
     syncError(state) {
-      state.syncStatus = "error";
+      state.syncStatus = "idle";
       state.syncFailCount += 1;
     },
     startFullSync(state) {
@@ -124,6 +125,34 @@ const canvasSlice = createSlice({
     },
     interactiveEdgeUpdate: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges) as Edge[];
+    },
+    addNodeWithEdge: (state, action: PayloadAction<{ node: Omit<Node, "id"> & { id?: string }; targetNodeId: string }>) => {
+      const { node: payload, targetNodeId } = action.payload;
+      const node: Node = {
+        id: payload.id ?? nanoid(),
+        type: payload.type,
+        position: payload.position,
+        data: payload.data,
+      };
+      const edge: Edge = {
+        id: nanoid(),
+        source: node.id,
+        target: targetNodeId,
+        type: "custom-edge",
+      };
+      const cmd: Command = {
+        canvas_id: state.canvasId!,
+        timeStamp: Date.now(),
+        forward: [
+          { type: "create_node", data: node },
+          { type: "create_edge", data: edge },
+        ],
+        backward: [
+          { type: "delete_edge", data: edge },
+          { type: "delete_node", data: node },
+        ],
+      };
+      applyCommand(state, cmd);
     },
     addNode: (state, action: PayloadAction<Omit<Node, "id"> & { id?: string }>) => {
       const node : Node = {
@@ -230,6 +259,12 @@ const canvasSlice = createSlice({
       const node = state.nodes.find((n) => n.id === action.payload.id);
       if (node) {
         node.data = { ...node.data, ...action.payload.data };
+        // 利用sync完成bindFileIdToNode操作
+        // 加入delta的updatedNodes中
+        // state.pendingDelta.updatedNodes.push(node);
+        const op : AtomicOp = { type: "update_node", data: node };
+        mergeOpsToDelta(state, state.pendingDelta, [op]);
+        // 注意：这里没有加入undoStack，因为这是服务端驱动的变更，不应该被用户撤销
       }
     },
     deleteNodesAndEdges: (state, action: PayloadAction<{nodes: Node[], edges: Edge[]}>) => {
@@ -266,6 +301,9 @@ const canvasSlice = createSlice({
         state.showControls = action.payload;
       }
     },
+    setMaximizedNode: (state, action: PayloadAction<string | null>) => {
+      state.maximizedNodeId = action.payload;
+    },
   },
 });
 
@@ -283,6 +321,7 @@ export const {
   updateTitle,
   interactiveNodeUpdate,
   interactiveEdgeUpdate,
+  addNodeWithEdge,
   addNode,
   deleteNode,
   updateNode,
@@ -292,6 +331,7 @@ export const {
   patchNodeData,
   deleteNodesAndEdges,
   toggleShowControls,
+  setMaximizedNode,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

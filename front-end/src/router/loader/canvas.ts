@@ -5,7 +5,12 @@ import { getCanvasDetail, syncCanvas } from "../../service/canvas";
 import { redirect, type LoaderFunctionArgs } from "react-router";
 import { store } from "../../store";
 import { loadCanvas, consumeDelta } from "../../feature/canvas/canvasSlice";
+import { getInflightSyncPromise } from "../../feature/canvas/useSyncCanvas";
 import type { GraphDelta } from "../../feature/canvas/types";
+import { convertBackendNodeToNode } from "../../service/canvas";
+import { getConversationList } from "../../service/canvas";
+import { loadConversations } from "../../feature/chat/chatSlice";
+import type { Conversation } from "../../feature/chat/types";
 
 export async function canvasLayoutLoader(){
     try{
@@ -28,7 +33,7 @@ function isDeltaEmpty(d: GraphDelta) {
         d.updatedNodes.length === 0 &&
         d.deletedNodesId.length === 0 &&
         d.createdEdges.length === 0 &&
-        d.deletedEdgesId.length === 0
+        d.deletedEdges.length === 0
     );
 }
 
@@ -54,20 +59,32 @@ export async function canvasLoader({ params }: LoaderFunctionArgs){
         return redirect("/canvas");
     }
 
-    // 切换画布前先 flush 旧的未同步变更
-    await flushPendingDelta();
+    // Wait for any in-flight sync from unmount cleanup before fetching
+    const inflight = getInflightSyncPromise();
+    if (inflight) await inflight;
 
-    const { success, message, data: canvasDetail } = await getCanvasDetail(canvasId);
-    if(!success || !canvasDetail) {
-        toast.error(message);
+    const [,conversationRes, canvasRes] = await Promise.all([
+        flushPendingDelta(),
+        getConversationList(canvasId),
+        getCanvasDetail(canvasId),
+    ]);
+
+    if(!conversationRes.success || !conversationRes.data) {
+        toast.error(conversationRes.message);
         return redirect("/canvas");
     }
+    if(!canvasRes.success || !canvasRes.data) {
+        toast.error(canvasRes.message);
+        return redirect("/canvas");
+    }
+
+    store.dispatch(loadConversations(conversationRes.data as Conversation[]));
     store.dispatch(loadCanvas({
-        canvasId: canvasDetail.canvasId,
-        title: canvasDetail.title,
-        nodes: canvasDetail.nodes,
-        edges: canvasDetail.edges,
-        version: canvasDetail.version,
+        canvasId: canvasRes.data.canvasId,
+        title: canvasRes.data.title,
+        nodes: canvasRes.data.nodes.map(convertBackendNodeToNode),
+        edges: canvasRes.data.edges,
+        version: canvasRes.data.version,
     }));
     return null;
 }

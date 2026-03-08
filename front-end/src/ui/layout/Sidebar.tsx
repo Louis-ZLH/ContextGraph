@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import type { User } from "../../service/type";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ThemeName } from "../../feature/user/userSlice";
 import { UserModal } from "./UserModal";
@@ -18,31 +18,16 @@ import { useQuery } from "@tanstack/react-query";
 import type { Canvas } from "../../service/type";
 import { SidebarCanvasItem } from "./SidebarCanvasItem";
 
-// 模拟的 canvases 数据（后续会从后端获取）
-// const mockCanvases = [
-//   { id: "1", title: "AI Research Notes" },
-//   { id: "2", title: "Product Roadmap 2026" },
-//   { id: "3", title: "AI Research Notes" },
-//   { id: "4", title: "Product Roadmap 2026" },
-//   { id: "5", title: "AI Research Notes" },
-//   { id: "6", title: "Product Roadmap 2026" },
-//   { id: "7", title: "AI Research Notes" },
-//   { id: "8", title: "Product Roadmap 2026" },
-//   { id: "9", title: "AI Research Notes" },
-//   { id: "10", title: "Product Roadmap 2026" },
-//   { id: "11", title: "AI Research Notes" },
-//   { id: "12", title: "Product Roadmap 2026" },
-//   { id: "13", title: "AI Research Notes" },
-//   { id: "14", title: "Product Roadmap 2026" },
-//   { id: "15", title: "AI Research Notes" },
-//   { id: "16", title: "Product Roadmap 2026" },
-//   { id: "17", title: "AI Research Notes" },
-//   { id: "18", title: "Product Roadmap 2026" },
-// ];
-
 export function Sidebar({ user }: { user: User | null }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsOpen(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
   const theme = useSelector(
     (state: { user: { theme: ThemeName } }) => state.user.theme
   );
@@ -54,7 +39,7 @@ export function Sidebar({ user }: { user: User | null }) {
     <aside
       className={`${
         isOpen ? "w-64" : "w-16"
-      } relative flex flex-col border-r border-main bg-sidebar z-20 transition-[width] duration-300 ease-in-out overflow-hidden whitespace-nowrap`}
+      } relative flex flex-col border-r border-main bg-sidebar z-20 transition-[width] duration-100 ease-in-out overflow-hidden whitespace-nowrap`}
     >
       {/* Collapsed State: Only Show Open Button and Avatar */}
       <div
