@@ -25,6 +25,12 @@ type FileListItem struct {
 	CreatedAt   string `json:"created_at"`
 }
 
+// 存储用量响应
+type StorageUsageResponse struct {
+	Used  int64 `json:"used"`  // 已用（字节）
+	Limit int64 `json:"limit"` // 上限（字节，200MB）
+}
+
 // 文件列表响应（带分页）
 type FileListResponse struct {
 	Files []FileListItem `json:"files"`

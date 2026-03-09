@@ -1,6 +1,6 @@
 export const SUGGESTIONS = [
   "Create images",
-  "Summarize this document",
+  "Summarize documents",
   "Help me learn",
   "Write anything",
 ];

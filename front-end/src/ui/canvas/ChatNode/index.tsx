@@ -5,7 +5,8 @@ import type { ThemeName } from "../../../feature/user/userSlice";
 import { deleteNode, toggleShowControls, setMaximizedNode, addNodeWithEdge, patchNodeData } from "../../../feature/canvas/canvasSlice";
 import { nanoid } from "@reduxjs/toolkit";
 import { toast } from "react-hot-toast";
-import { isFileAccepted, isOldOfficeFormat, uploadFile } from "../../../service/file";
+import { isFileAccepted, isFileTooLarge, isOldOfficeFormat, uploadFile } from "../../../service/file";
+import { queryClient } from "../../../query";
 import ChatNodeHeader from "./ChatNodeHeader";
 import WelcomeScreen from "./WelcomeScreen";
 import MessageList from "./Message/MessageList";
@@ -98,6 +99,11 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
         toast.error("不支持旧版 Office 格式（.doc/.xls/.ppt），请转换为 .docx/.xlsx/.pptx 后重新上传");
       }
       const accepted = files.filter((f) => isFileAccepted(f));
+      const tooLarge = accepted.filter((f) => isFileTooLarge(f));
+      if (tooLarge.length > 0) {
+        toast.error(`${tooLarge.length} file(s) exceed 5MB limit`);
+      }
+      const validFiles = accepted.filter((f) => !isFileTooLarge(f));
       const otherRejected = files.length - oldOffice.length - accepted.length;
       if (otherRejected > 0) {
         toast.error(`${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`);
@@ -106,14 +112,14 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
       const state = store.getState();
       const nodePosition = state.canvas.nodes.find((n) => n.id === id)?.position;
       const canvasId = state.canvas.canvasId;
-      if (accepted.length === 0 || !nodePosition || !canvasId) return;
+      if (validFiles.length === 0 || !nodePosition || !canvasId) return;
 
       // ChatNode: w-[400px], ResourceNode: w-[230px]
       const RESOURCE_NODE_WIDTH = 230;
       const GAP = 50;
 
-      for (let i = 0; i < accepted.length; i++) {
-        const file = accepted[i];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
         const nodeId = nanoid();
 
         // 将 ResourceNode 放在 ChatNode 左侧，留出间距让连线清晰
@@ -141,6 +147,8 @@ function ChatNode({ id, selected }: { id: string; selected?: boolean }) {
               throw new Error("File ID is missing");
             }
             dispatch(patchNodeData({ id: nodeId, data: { fileId: data.fileId } }));
+            queryClient.invalidateQueries({ queryKey: ["file", "list"] });
+            queryClient.invalidateQueries({ queryKey: ["file", "storage"] });
           } catch (error: unknown) {
             if (error instanceof Error) {
               toast.error(error.message);

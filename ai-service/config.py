@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
 
     # RabbitMQ
-    rabbitmq_url: str = "amqp://guest:guest@127.0.0.1:5672/"
+    rabbitmq_url: str = "amqp://guest:guest@127.0.0.1:5672/?heartbeat=300"
 
     # Server
     host: str = "0.0.0.0"

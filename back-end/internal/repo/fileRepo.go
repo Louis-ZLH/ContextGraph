@@ -259,6 +259,16 @@ func (r *FileRepo) RemoveMinioObject(ctx context.Context, minioPath string) erro
 	return r.minioClient.RemoveObject(ctx, r.bucket, minioPath, minio.RemoveObjectOptions{})
 }
 
+// GetUserStorageUsed 查询用户已用存储（字节）
+func (r *FileRepo) GetUserStorageUsed(ctx context.Context, userID int64) (int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).Model(&model.File{}).
+		Where("user_id = ?", userID).
+		Select("COALESCE(SUM(file_size), 0)").
+		Scan(&total).Error
+	return total, err
+}
+
 // ListMinioObjects 列出指定前缀下的所有 MinIO 对象路径（按名称排序）
 func (r *FileRepo) ListMinioObjects(ctx context.Context, prefix string) ([]string, error) {
 	var paths []string

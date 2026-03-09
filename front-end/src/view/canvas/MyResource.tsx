@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Search, Download, Trash2, FileQuestion, SearchX, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { fileListQueryOptions } from "../../query/file";
 import { deleteFile, formatFileSize, getFileCategoryFromMime } from "../../service/file";
 import { FileTypeIcon } from "../../ui/canvas/ResourceNode/FileTypeIcon";
 import { Modal } from "../../ui/common/Modal";
+import { StorageBar } from "../../ui/common/StorageBar";
+import { UploadButton } from "../../ui/common/UploadButton";
 import { BASE_URL } from "../../util/api";
-import { queryClient } from "../../query";
 import type { FileListItem } from "../../service/type";
 
-const PAGE_LIMIT = 20;
+const PAGE_LIMIT = 10;
 
 function useDebounce(value: string, delay: number) {
   const [debounced, setDebounced] = useState(value);
@@ -22,20 +23,37 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function MyResource() {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<FileListItem | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const debouncedKeyword = useDebounce(keyword, 300);
 
-  const { data: result, isLoading } = useQuery(
-    fileListQueryOptions({ page, limit: PAGE_LIMIT, keyword: debouncedKeyword })
-  );
+  const { data: result, isLoading } = useQuery({
+    ...fileListQueryOptions({ page, limit: PAGE_LIMIT, keyword: debouncedKeyword }),
+    placeholderData: keepPreviousData,
+  });
 
   const fileList = result?.data;
   const files = fileList?.files ?? [];
   const total = fileList?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+
+  // Prefetch adjacent pages for smooth pagination
+  useEffect(() => {
+    if (isLoading) return;
+    if (page < totalPages) {
+      queryClient.prefetchQuery(
+        fileListQueryOptions({ page: page + 1, limit: PAGE_LIMIT, keyword: debouncedKeyword })
+      );
+    }
+    if (page > 1) {
+      queryClient.prefetchQuery(
+        fileListQueryOptions({ page: page - 1, limit: PAGE_LIMIT, keyword: debouncedKeyword })
+      );
+    }
+  }, [page, totalPages, debouncedKeyword, isLoading, queryClient]);
 
   const { mutate: doDelete, isPending: isDeleting } = useMutation({
     mutationFn: (fileId: string) => deleteFile(fileId),
@@ -43,6 +61,7 @@ export default function MyResource() {
       if (data.success) {
         toast.success("File deleted");
         queryClient.invalidateQueries({ queryKey: ["file", "list"] });
+        queryClient.invalidateQueries({ queryKey: ["file", "storage"] });
         setDeleteTarget(null);
       } else {
         toast.error(data.message);
@@ -71,25 +90,29 @@ export default function MyResource() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <h1 className="text-3xl font-bold text-primary">My Resources</h1>
-          <div className={`relative w-full sm:w-72 transition-all duration-300 ${searchFocused ? "sm:w-80" : ""}`}>
-            <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${searchFocused ? "text-accent" : "text-secondary"}`} />
-            <input
-              type="text"
-              value={keyword}
-              onChange={handleSearchChange}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="Search files..."
-              className="w-full pl-9 pr-8 py-2 rounded-lg border border-main bg-node-bg text-primary text-sm placeholder:text-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-(--accent)/70 transition-all duration-200"
-            />
-            {keyword && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-secondary hover:text-primary transition-colors cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <StorageBar />
+            <UploadButton />
+            <div className={`relative w-full sm:w-72 transition-all duration-300 ${searchFocused ? "sm:w-80" : ""}`}>
+              <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${searchFocused ? "text-accent" : "text-secondary"}`} />
+              <input
+                type="text"
+                value={keyword}
+                onChange={handleSearchChange}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                placeholder="Search files..."
+                className="w-full pl-9 pr-8 py-2 rounded-lg border border-main bg-node-bg text-primary text-sm placeholder:text-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-(--accent)/70 transition-all duration-200"
+              />
+              {keyword && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-secondary hover:text-primary transition-colors cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

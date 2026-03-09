@@ -23,6 +23,7 @@ type FileService interface {
 	BindFileToNode(ctx context.Context, userID int64, fileID int64, nodeID string) error
 	ListFiles(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error)
 	DeleteFile(ctx context.Context, userID int64, fileID int64) error
+	GetStorageUsage(ctx context.Context, userID int64) (int64, int64, error)
 }
 
 type FileHandler struct {
@@ -240,4 +241,28 @@ func (h *FileHandler) BindFileToNode(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessMsg("bind successfully"))
+}
+
+// GetStorageUsage GET /api/file/storage — 返回用户存储用量
+func (h *FileHandler) GetStorageUsage(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.Error(apperr.BizUnauthorized, "Unauthorized"))
+		return
+	}
+
+	used, limit, err := h.fileService.GetStorageUsage(c.Request.Context(), userID.(int64))
+	if err != nil {
+		if appErr, ok := apperr.GetAppError(err); ok {
+			c.JSON(appErr.Code, dto.Error(appErr.BizCode, appErr.Message))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.Error(apperr.BizUnknown, "Internal Server Error"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.Success(dto.StorageUsageResponse{
+		Used:  used,
+		Limit: limit,
+	}))
 }

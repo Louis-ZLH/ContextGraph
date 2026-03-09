@@ -24,12 +24,13 @@ import (
 )
 
 const (
-	maxFileSize     = 5 << 20  // 5 MB
-	maxTextFileSize = 50 << 10 // 50 KB
-	maxPDFPages     = 3
-	maxPPTSlides    = 5
-	maxImageWidth   = 1568
-	jpegQuality     = 80
+	maxFileSize        = 5 << 20   // 5 MB
+	maxTextFileSize    = 50 << 10  // 50 KB
+	maxStoragePerUser  = 200 << 20 // 200 MB
+	maxPDFPages        = 3
+	maxPPTSlides       = 5
+	maxImageWidth      = 1568
+	jpegQuality        = 80
 )
 
 // 允许的文件扩展名
@@ -85,6 +86,7 @@ type FileRepo interface {
 	ListFilesByUser(ctx context.Context, userID int64, keyword string, page, limit int) ([]model.File, int64, error)
 	DeleteFileByID(ctx context.Context, fileID int64) error
 	RemoveMinioObject(ctx context.Context, minioPath string) error
+	GetUserStorageUsed(ctx context.Context, userID int64) (int64, error)
 }
 
 type FileService struct {
@@ -124,7 +126,16 @@ func (s *FileService) UploadFile(ctx context.Context, userID int64, fileHeader *
 		return 0, apperr.BadRequest("不支持的文件 MIME 类型")
 	}
 
-	// 5. 打开文件
+	// 5. 校验用户存储配额
+	used, err := s.repo.GetUserStorageUsed(ctx, userID)
+	if err != nil {
+		return 0, apperr.Wrap(err, 500, apperr.BizUnknown, "查询存储用量失败")
+	}
+	if used+fileHeader.Size > maxStoragePerUser {
+		return 0, apperr.BadRequest("存储空间不足，免费用户最多上传 200MB 文件")
+	}
+
+	// 6. 打开文件
 	file, err := fileHeader.Open()
 	if err != nil {
 		return 0, apperr.Wrap(err, 500, apperr.BizUnknown, "无法读取上传文件")
@@ -137,7 +148,7 @@ func (s *FileService) UploadFile(ctx context.Context, userID int64, fileHeader *
 		uploadContentType string    = contentType
 	)
 
-	// 6. 按类型进行额外校验和处理
+	// 7. 按类型进行额外校验和处理
 	switch {
 	case contentType == "application/pdf":
 		// PDF：校验页数 ≤ 3
@@ -205,13 +216,13 @@ func (s *FileService) UploadFile(ctx context.Context, userID int64, fileHeader *
 		uploadContentType = "image/jpeg"
 	}
 
-	// 7. 上传到 MinIO
+	// 8. 上传到 MinIO
 	minioPath, err := s.repo.UploadToMinio(ctx, userID, uploadReader, fileHeader.Filename, uploadSize, uploadContentType)
 	if err != nil {
 		return 0, err
 	}
 
-	// 8. 保存文件记录到数据库
+	// 9. 保存文件记录到数据库
 	fileRecord := &model.File{
 		UserID:      userID,
 		MinioPath:   minioPath,
@@ -223,7 +234,7 @@ func (s *FileService) UploadFile(ctx context.Context, userID int64, fileHeader *
 		return 0, err
 	}
 
-	// 9. 需要异步预处理的文件类型：SET Redis keys + Publish RabbitMQ
+	// 10. 需要异步预处理的文件类型：SET Redis keys + Publish RabbitMQ
 	if needsPreprocessing(uploadContentType) {
 		if err := s.repo.SetFileProcessingKeys(ctx, fileRecord.ID); err != nil {
 			log.Printf("[UploadFile] SetFileProcessingKeys failed for fileID=%d: %v", fileRecord.ID, err)
@@ -315,6 +326,15 @@ func (s *FileService) BindFileToNode(ctx context.Context, userID int64, fileID i
 
 	// 3. 更新节点的 file_id
 	return s.repo.UpdateNodeFileID(ctx, nodeID, &fileID)
+}
+
+// GetStorageUsage 获取用户存储用量
+func (s *FileService) GetStorageUsage(ctx context.Context, userID int64) (int64, int64, error) {
+	used, err := s.repo.GetUserStorageUsed(ctx, userID)
+	if err != nil {
+		return 0, 0, apperr.Wrap(err, 500, apperr.BizUnknown, "查询存储用量失败")
+	}
+	return used, maxStoragePerUser, nil
 }
 
 // compressImage 压缩图片：最大宽度 1568px，JPEG quality=80

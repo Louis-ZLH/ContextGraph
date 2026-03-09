@@ -98,6 +98,11 @@ export interface CanvasSearchResponse {
     limit: number;
 }
 
+export interface StorageUsageResponse {
+  used: number;
+  limit: number;
+}
+
 // 前端传后端的数据格式
 export interface DTONodeReadyToSend {
     id: string;

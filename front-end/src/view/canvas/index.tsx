@@ -48,9 +48,11 @@ import {
 import { useSyncCanvas } from "../../feature/canvas/useSyncCanvas";
 import {
   isFileAccepted,
+  isFileTooLarge,
   isOldOfficeFormat,
   uploadFile,
 } from "../../service/file";
+import { queryClient } from "../../query";
 import type { RootState } from "../../store";
 
 const nodeTypes = {
@@ -347,16 +349,21 @@ export function LayoutFlowInner() {
         );
       }
       const accepted = files.filter((f) => isFileAccepted(f));
+      const tooLarge = accepted.filter((f) => isFileTooLarge(f));
+      if (tooLarge.length > 0) {
+        toast.error(`${tooLarge.length} file(s) exceed 5MB limit`);
+      }
+      const validFiles = accepted.filter((f) => !isFileTooLarge(f));
       const otherRejected = files.length - oldOffice.length - accepted.length;
       if (otherRejected > 0) {
         toast.error(
           `${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`,
         );
       }
-      if (accepted.length === 0) return;
+      if (validFiles.length === 0) return;
 
-      for (let i = 0; i < accepted.length; i++) {
-        const file = accepted[i];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
         const nodeId = nanoid();
 
         // 多文件时向右下方依次偏移，避免完全重叠
@@ -395,6 +402,8 @@ export function LayoutFlowInner() {
                 data: { fileId: data.fileId },
               }),
             );
+            queryClient.invalidateQueries({ queryKey: ["file", "list"] });
+            queryClient.invalidateQueries({ queryKey: ["file", "storage"] });
           } catch (error: unknown) {
             if (error instanceof Error) {
               toast.error(error.message);
@@ -446,13 +455,18 @@ export function LayoutFlowInner() {
         );
       }
       const accepted = files.filter((f) => isFileAccepted(f));
+      const tooLarge = accepted.filter((f) => isFileTooLarge(f));
+      if (tooLarge.length > 0) {
+        toast.error(`${tooLarge.length} file(s) exceed 5MB limit`);
+      }
+      const validFiles = accepted.filter((f) => !isFileTooLarge(f));
       const otherRejected = files.length - oldOffice.length - accepted.length;
       if (otherRejected > 0) {
         toast.error(
           `${otherRejected} files rejected, only support images, pdfs, docs, spreadsheets, and text files`,
         );
       }
-      if (accepted.length === 0) return;
+      if (validFiles.length === 0) return;
 
       const { x, y, zoom } = getViewport();
       const reactFlowBounds = document
@@ -463,8 +477,8 @@ export function LayoutFlowInner() {
       const centerX = -x / zoom + reactFlowBounds.width / 2 / zoom;
       const centerY = -y / zoom + reactFlowBounds.height / 2 / zoom;
 
-      for (let i = 0; i < accepted.length; i++) {
-        const file = accepted[i];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
         const nodeId = nanoid();
 
         const offsetX = (Math.random() - 0.5) * 60 + i * 40;
@@ -494,6 +508,8 @@ export function LayoutFlowInner() {
                 data: { fileId: data.fileId },
               }),
             );
+            queryClient.invalidateQueries({ queryKey: ["file", "list"] });
+            queryClient.invalidateQueries({ queryKey: ["file", "storage"] });
           } catch (error: unknown) {
             if (error instanceof Error) {
               toast.error(error.message);

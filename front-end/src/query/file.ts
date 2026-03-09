@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { getFileList } from "../service/file";
+import { getFileList, getStorageUsage } from "../service/file";
 
 export function fileListQueryOptions(params: { page: number; limit: number; keyword: string }) {
   return queryOptions({
@@ -9,3 +9,10 @@ export function fileListQueryOptions(params: { page: number; limit: number; keyw
     retry: false,
   });
 }
+
+export const storageUsageQueryOptions = queryOptions({
+  queryKey: ["file", "storage"],
+  queryFn: () => getStorageUsage(),
+  staleTime: 1000 * 60 * 5,
+  retry: false,
+});

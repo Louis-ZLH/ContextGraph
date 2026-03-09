@@ -11,6 +11,7 @@ func NewFileRouter(api *gin.RouterGroup, a *app.App) {
 
 	fileApi.Use(middleware.AuthMiddleware(a.RDB, a.DB))
 	fileApi.GET("/list", a.H.FileHandler.ListFiles)
+	fileApi.GET("/storage", a.H.FileHandler.GetStorageUsage)
 	fileApi.POST("/upload", a.H.FileHandler.UploadFile)
 	fileApi.GET("/:id", a.H.FileHandler.DownloadFile)
 	fileApi.GET("/:id/info", a.H.FileHandler.GetFileInfo)

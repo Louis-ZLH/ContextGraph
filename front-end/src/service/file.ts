@@ -1,7 +1,14 @@
 import type { FileCategory } from "../feature/canvas/canvasSlice";
 import { apiRequest } from "../util/api";
-import type { JSONResponse, uploadFileResponse, getFileInfoResponse, FileListResponse } from "./type";
+import type { JSONResponse, uploadFileResponse, getFileInfoResponse, FileListResponse, StorageUsageResponse } from "./type";
 import { toCamelCase } from "../util/transform";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+/** 判断文件是否超过大小限制（5MB） */
+export function isFileTooLarge(file: File): boolean {
+  return file.size > MAX_FILE_SIZE;
+}
 
 // ────────────── 文件类型检测 ──────────────
 
@@ -175,6 +182,23 @@ export async function deleteFile(fileId: string): Promise<{ success: boolean, me
       return { success: false, message: error.message };
     }
     return { success: false, message: "Failed to delete file" };
+  }
+}
+
+export async function getStorageUsage(): Promise<{ success: boolean; message: string; data: StorageUsageResponse | null }> {
+  try {
+    const response = await apiRequest<JSONResponse>("/api/file/storage", {
+      method: "GET",
+    });
+    if (response.code !== 0) {
+      throw new Error(response.message);
+    }
+    return { success: true, message: response.message, data: toCamelCase(response.data) as StorageUsageResponse };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return { success: false, message: error.message, data: null };
+    }
+    return { success: false, message: "Failed to get storage usage", data: null };
   }
 }
 
