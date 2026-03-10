@@ -701,6 +701,7 @@ export function LayoutFlowInner() {
         onDrop={onDrop}
         minZoom={0.4}
         maxZoom={2}
+        proOptions={{ hideAttribution: true }}
       >
         <div style={showControls ? undefined : HIDDEN_STYLE}>
           <CanvasControls
