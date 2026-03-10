@@ -11,6 +11,7 @@ import { canvasLayoutLoader, canvasLoader } from "./loader/canvas";
 import NewCanvas from "../view/canvas/NewCanvas";
 import MyResource from "../view/canvas/MyResource";
 import SearchCanvases from "../view/canvas/SearchCanvases";
+import GuidePage from "../view/Guide";
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +36,10 @@ export const router = createBrowserRouter([
       {
         path: "/about",
         element: <div>About</div>,
+      },
+      {
+        path: "/guide",
+        element: <GuidePage />,
       },
       {
         path: "/canvas",

@@ -9,12 +9,12 @@ EMAIL="luhaozeng@gmail.com"   # Let's Encrypt 到期提醒邮箱
 COMPOSE_FILE="docker-compose.yaml"
 
 echo ">>> 1. 创建临时自签名证书（让 nginx 先启动）"
-mkdir -p ./certbot/conf/live/$DOMAIN
 docker compose run --rm --entrypoint "\
+  sh -c 'mkdir -p /etc/letsencrypt/live/$DOMAIN && \
   openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
     -keyout /etc/letsencrypt/live/$DOMAIN/privkey.pem \
     -out /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
-    -subj '/CN=localhost'" certbot
+    -subj /CN=localhost'" certbot
 
 echo ">>> 2. 启动 nginx（使用临时证书）"
 docker compose up -d front-end

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { PenTool, BookOpen, Sparkles } from "lucide-react";
+import { PenTool, Sparkles } from "lucide-react";
 
 export function HeroSection() {
   const navigate = useNavigate();
@@ -41,7 +41,11 @@ export function HeroSection() {
               <PenTool className="w-5 h-5" />
               Start Creating
             </button>
-            <button className="cursor-pointer px-8 py-4 bg-white text-stone-700 font-bold rounded-lg border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-colors flex items-center justify-center gap-2" style={{ boxShadow: '3px 3px 0px rgba(41, 37, 36, 0.08)' }}>
+            <button
+              className="cursor-pointer px-8 py-4 bg-white text-stone-700 font-bold rounded-lg border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-colors flex items-center justify-center gap-2"
+              style={{ boxShadow: '3px 3px 0px rgba(41, 37, 36, 0.08)' }}
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+            >
               Learn More
             </button>
           </div>
@@ -53,7 +57,7 @@ export function HeroSection() {
 
           {/* Center node - paper style */}
           <div className="relative z-10 w-40 h-40 bg-white rounded-2xl border-2 border-stone-200 flex items-center justify-center" style={{ boxShadow: '6px 6px 0px rgba(41, 37, 36, 0.1)' }}>
-            <BookOpen className="h-16 w-16 text-orange-600" />
+            <img src="/icon.svg" alt="ContextCanvas" className="h-16 w-16" />
             <div className="absolute inset-[-20px] border border-stone-200 rounded-full border-dashed opacity-40"></div>
             <div className="absolute inset-[-40px] border border-stone-200 rounded-full border-dotted opacity-20"></div>
           </div>
@@ -63,7 +67,7 @@ export function HeroSection() {
             <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-orange-500" /> Branch: React Hooks</span>
           </div>
           <div className="absolute bottom-[20%] left-[5%] bg-white px-4 py-2 rounded-lg text-xs text-stone-600 border border-stone-200 animate-float" style={{ animationDelay: '2s', boxShadow: '3px 3px 0px rgba(41, 37, 36, 0.08)', fontFamily: "'Inter', system-ui, sans-serif" }}>
-            <span className="flex items-center gap-1.5"><BookOpen className="w-3 h-3 text-orange-500" /> Context: Backend API</span>
+            <span className="flex items-center gap-1.5"><img src="/enhanced-icon (4).svg" alt="" className="w-3 h-3" /> Context: Backend API</span>
           </div>
 
           {/* Connecting lines */}

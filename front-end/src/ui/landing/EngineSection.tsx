@@ -44,15 +44,21 @@ export function EngineSection() {
               </div>
               <div className="pl-4">
                 {"{"} <span className="text-blue-600">"id"</span>:{" "}
-                <span className="text-green-700">"gpt-4o"</span>,{" "}
+                <span className="text-green-700">"gpt-5.2"</span>,{" "}
                 <span className="text-blue-600">"provider"</span>:{" "}
                 <span className="text-orange-600">"OpenAI"</span> {"}"},
               </div>
               <div className="pl-4">
                 {"{"} <span className="text-blue-600">"id"</span>:{" "}
-                <span className="text-green-700">"claude-3.5-sonnet"</span>,{" "}
+                <span className="text-green-700">"claude-opus-4.5"</span>,{" "}
                 <span className="text-blue-600">"provider"</span>:{" "}
                 <span className="text-orange-600">"Anthropic"</span> {"}"},
+              </div>
+              <div className="pl-4">
+                {"{"} <span className="text-blue-600">"id"</span>:{" "}
+                <span className="text-green-700">"gemini-3.1-preview"</span>,{" "}
+                <span className="text-blue-600">"provider"</span>:{" "}
+                <span className="text-orange-600">"Google"</span> {"}"},
               </div>
               <div className="pl-4 opacity-40">// More models available...</div>
               <div>]</div>

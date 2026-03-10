@@ -2,6 +2,8 @@ import { LandingHeader } from "../ui/landing/LandingHeader";
 import { HeroSection } from "../ui/landing/HeroSection";
 import { FeaturesSection } from "../ui/landing/FeaturesSection";
 import { EngineSection } from "../ui/landing/EngineSection";
+import { PricingSection } from "../ui/landing/PricingSection";
+import { DocsSection } from "../ui/landing/DocsSection";
 import { Footer } from "../ui/landing/Footer";
 
 export default function LandingPage() {
@@ -19,6 +21,8 @@ export default function LandingPage() {
         <HeroSection />
         <FeaturesSection />
         <EngineSection />
+        <PricingSection />
+        <DocsSection />
         <Footer />
       </main>
     </div>
