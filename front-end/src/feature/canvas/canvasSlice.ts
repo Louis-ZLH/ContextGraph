@@ -242,10 +242,20 @@ const canvasSlice = createSlice({
       applyCommand(state, cmd);
     },
     onDisconnect: (state, action: PayloadAction<string>) => {
+      const existing = state.edges.find((e) => e.id === action.payload);
+      if (!existing) return;
+
+      // Prevent deletion of generation edges (ChatNode → ResourceNode)
+      const sourceNode = state.nodes.find((n) => n.id === existing.source);
+      const targetNode = state.nodes.find((n) => n.id === existing.target);
+      if (sourceNode?.type === "chatNode" && targetNode?.type === "resourceNode") {
+        return;
+      }
+
       const edge : Edge = {
         id: action.payload,
-        source: state.edges.find((e) => e.id === action.payload)?.source ?? "",
-        target: state.edges.find((e) => e.id === action.payload)?.target ?? "",
+        source: existing.source,
+        target: existing.target,
         type: "custom-edge",
       }
       const cmd: Command = {
@@ -270,7 +280,16 @@ const canvasSlice = createSlice({
       }
     },
     deleteNodesAndEdges: (state, action: PayloadAction<{nodes: Node[], edges: Edge[]}>) => {
-      const { nodes, edges } = action.payload;
+      const { nodes } = action.payload;
+      // Filter out generation edges (ChatNode → ResourceNode) unless their endpoint node is also being deleted
+      const deletingNodeIds = new Set(nodes.map((n) => n.id));
+      const edges = action.payload.edges.filter((e) => {
+        const sourceNode = state.nodes.find((n) => n.id === e.source);
+        const targetNode = state.nodes.find((n) => n.id === e.target);
+        const isGeneration = sourceNode?.type === "chatNode" && targetNode?.type === "resourceNode";
+        if (!isGeneration) return true;
+        return deletingNodeIds.has(e.source) || deletingNodeIds.has(e.target);
+      });
       if (nodes.length === 0 && edges.length === 0) return;
       const forwardOps: AtomicOp[] = [];
       const backwardOps: AtomicOp[] = [];
@@ -305,6 +324,24 @@ const canvasSlice = createSlice({
     },
     setMaximizedNode: (state, action: PayloadAction<string | null>) => {
       state.maximizedNodeId = action.payload;
+    },
+    /** AI 生成资源后，服务端驱动添加 ResourceNode + Edge（不进 undo 栈） */
+    addGeneratedResource: (state, action: PayloadAction<{ nodeId: string; edgeId: string; chatNodeId: string; fileId: string; position: { x: number; y: number } }>) => {
+      const { nodeId, edgeId, chatNodeId, fileId, position } = action.payload;
+      const node: Node = {
+        id: nodeId,
+        type: "resourceNode",
+        position,
+        data: { fileId },
+      };
+      const edge: Edge = {
+        id: edgeId,
+        source: chatNodeId,
+        target: nodeId,
+        type: "custom-edge",
+      };
+      state.nodes.push(node);
+      state.edges.push(edge);
     },
     /** 一次性：创建节点 + 最大化 + 隐藏控件，避免多次 dispatch 在 StrictMode 下的竞态 */
     executeCommandAndMaximize(
@@ -344,6 +381,7 @@ export const {
   toggleShowControls,
   setMaximizedNode,
   executeCommandAndMaximize,
+  addGeneratedResource,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

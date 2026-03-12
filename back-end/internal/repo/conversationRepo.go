@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/luhao/contextGraph/internal/model"
+	apperr "github.com/luhao/contextGraph/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -144,6 +145,23 @@ func (r *ConversationRepo) IsMsgSummaryLocked(ctx context.Context, conversationI
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// UpdateMessageTokenUsage 更新指定 message 的 token 用量
+func (r *ConversationRepo) UpdateMessageTokenUsage(ctx context.Context, messageID int64, promptTokens, completionTokens int) error {
+	result := r.db.WithContext(ctx).Model(&model.Message{}).
+		Where("id = ?", messageID).
+		Updates(map[string]interface{}{
+			"prompt_tokens":     promptTokens,
+			"completion_tokens": completionTokens,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return apperr.NotFound(fmt.Sprintf("message %d not found", messageID))
+	}
+	return nil
 }
 
 // UpdateMessageSummary 更新指定 message 的 summary 字段

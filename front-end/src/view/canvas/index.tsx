@@ -527,13 +527,23 @@ export function LayoutFlowInner() {
   //处理节点和边删除
   const onDelete = useCallback(
     ({ nodes, edges }: { nodes: BaseNode[]; edges: BaseEdge[] }) => {
+      const allNodes = getNodes();
+
       const nodesToDelete: Node[] = nodes.map((n) => ({
         id: n.id,
         type: n.type as "chatNode" | "resourceNode",
         position: { ...n.position },
         data: { ...n.data },
       }));
-      const edgesToDelete: Edge[] = edges.map((e) => ({
+
+      // Filter out generation edges (ChatNode → ResourceNode) from direct deletion
+      const deletableEdges = edges.filter((e) => {
+        const sourceNode = allNodes.find((n) => n.id === e.source);
+        const targetNode = allNodes.find((n) => n.id === e.target);
+        return !(sourceNode?.type === "chatNode" && targetNode?.type === "resourceNode");
+      });
+
+      const edgesToDelete: Edge[] = deletableEdges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -543,7 +553,7 @@ export function LayoutFlowInner() {
         deleteNodesAndEdges({ nodes: nodesToDelete, edges: edgesToDelete }),
       );
     },
-    [dispatch],
+    [dispatch, getNodes],
   );
 
   const skipFitViewForCanvasRef = useRef<string | null>(null);

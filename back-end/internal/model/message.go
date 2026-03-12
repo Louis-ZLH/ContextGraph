@@ -16,6 +16,8 @@ type Message struct {
     CompletionTokens int        `json:"completion_tokens"`
     ExpiredAt        *time.Time `json:"expired_at"`
     Summary          *string    `gorm:"type:text" json:"summary,omitempty"`
+    FileURL          *string    `gorm:"type:text" json:"file_url,omitempty"`
+    FileName         *string    `gorm:"type:text" json:"file_name,omitempty"`
 }
 
 func (m *Message) TableName() string {

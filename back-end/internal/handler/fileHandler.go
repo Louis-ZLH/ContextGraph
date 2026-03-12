@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -94,7 +95,7 @@ func (h *FileHandler) DownloadFile(c *gin.Context) {
 		disposition = "attachment"
 	}
 
-	c.Header("Content-Disposition", fmt.Sprintf(`%s; filename="%s"`, disposition, fileMeta.Filename))
+	c.Header("Content-Disposition", fmt.Sprintf(`%s; filename*=UTF-8''%s`, disposition, url.PathEscape(fileMeta.Filename)))
 	c.Header("Content-Type", fileMeta.ContentType)
 	c.Header("Content-Length", strconv.FormatInt(fileMeta.FileSize, 10))
 	c.Header("Cache-Control", "private, max-age=86400")

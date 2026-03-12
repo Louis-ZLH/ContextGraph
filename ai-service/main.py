@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
     await rabbitmq.start_file_convert_consumer(file_convert_callback)
     yield
     # shutdown
+    from services.tool_executor import shutdown_internal_client
+    await shutdown_internal_client()
     await rabbitmq.disconnect()
     await redis_client.disconnect()
 

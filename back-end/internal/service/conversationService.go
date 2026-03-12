@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -34,6 +35,7 @@ type conversationRepo interface {
 	GetMessageByID(ctx context.Context, id int64) (model.Message, error)
 	UpdateCurrentLeafID(ctx context.Context, conversationID string, leafID int64) error
 	UpdateTitle(ctx context.Context, conversationID string, title string) error
+	UpdateMessageTokenUsage(ctx context.Context, messageID int64, promptTokens, completionTokens int) error
 	UpdateMessageSummary(ctx context.Context, messageID int64, summary string) error
 
 	// Message-level summary 锁
@@ -57,7 +59,7 @@ type conversationRepo interface {
 
 type ai interface {
 	GenerateTitle(ctx context.Context, messages []infra.ChatMessage) (string, error)
-	StreamChat(ctx context.Context, messages []infra.ChatMessage, model int) (<-chan infra.AIStreamEvent, error)
+	StreamChat(ctx context.Context, req infra.StreamChatReq) (<-chan infra.AIStreamEvent, error)
 	GenerateSummary(ctx context.Context, messages []infra.ChatMessage, previousSummary *string, summaryType string) (string, error)
 }
 
@@ -178,6 +180,8 @@ func (s *ConversationService) SendMessage(
 	assistantMsgID := idgen.GenID()
 	var assistantWritten bool
 	var deferErrMsg string
+	var capturedFileURL string  // capture file_url from resource_created for persistence
+	var capturedFileName string // capture filename from resource_created for persistence
 
 	// 兜底闭包：写入 error assistant + 更新 leaf
 	writeErrAssistant := func(content string, status string) string {
@@ -191,6 +195,8 @@ func (s *ConversationService) SendMessage(
 			Content:        content,
 			Model:          &req.Model,
 			Status:         status,
+			FileURL:        ptrIfNonEmpty(capturedFileURL),
+			FileName:       ptrIfNonEmpty(capturedFileName),
 		}
 		errMsg.ID = assistantMsgID
 		_ = s.conversationRepo.CreateMessage(context.Background(), &errMsg)
@@ -258,7 +264,17 @@ func (s *ConversationService) SendMessage(
 	aiCtx, aiCancel := context.WithCancel(ctx)
 	defer aiCancel()
 
-	aiCh, err := s.ai.StreamChat(aiCtx, chatMessages, req.Model)
+	chatReq := infra.StreamChatReq{
+		Messages: chatMessages,
+		Model:    req.Model,
+		ToolContext: &infra.ToolContext{
+			UserID:     userID,
+			CanvasID:   conv.CanvasID,
+			ChatNodeID: req.ConversationID,
+			MessageID:  strconv.FormatInt(assistantMsgID, 10),
+		},
+	}
+	aiCh, err := s.ai.StreamChat(aiCtx, chatReq)
 	if err != nil {
 		deferErrMsg = "Failed to call AI service"
 		return
@@ -299,6 +315,37 @@ func (s *ConversationService) SendMessage(
 				Type: "tool_call",
 				Data: dto.ToolCallData{Content: evt.Content},
 			}
+		case "image_partial":
+			if !firstTokenReceived {
+				firstTokenReceived = true
+				firstTokenTimer.Stop()
+			}
+			eventCh <- dto.SSEEvent{
+				Type: evt.Type,
+				Data: evt.RawData,
+			}
+		case "resource_created":
+			if !firstTokenReceived {
+				firstTokenReceived = true
+				firstTokenTimer.Stop()
+			}
+			// Extract file_url and filename from RawData for persistence
+			var rcData struct {
+				FileURL  string `json:"file_url"`
+				Filename string `json:"filename"`
+			}
+			if err := json.Unmarshal(evt.RawData, &rcData); err == nil {
+				if rcData.FileURL != "" {
+					capturedFileURL = rcData.FileURL
+				}
+				if rcData.Filename != "" {
+					capturedFileName = rcData.Filename
+				}
+			}
+			eventCh <- dto.SSEEvent{
+				Type: evt.Type,
+				Data: evt.RawData,
+			}
 		case "complete":
 			firstTokenTimer.Stop()
 			assistantMsg := model.Message{
@@ -310,6 +357,8 @@ func (s *ConversationService) SendMessage(
 				Status:           "completed",
 				PromptTokens:     evt.PromptTokens,
 				CompletionTokens: evt.CompletionTokens,
+				FileURL:          ptrIfNonEmpty(capturedFileURL),
+				FileName:         ptrIfNonEmpty(capturedFileName),
 			}
 			assistantMsg.ID = assistantMsgID
 			if err := s.conversationRepo.CreateMessage(ctx, &assistantMsg); err != nil {
@@ -430,6 +479,8 @@ func (s *ConversationService) RetryMessage(
 	assistantMsgID := idgen.GenID()
 	var assistantWritten bool
 	var deferErrMsg string
+	var capturedFileURL string  // capture file_url from resource_created for persistence
+	var capturedFileName string // capture filename from resource_created for persistence
 
 	// 兜底闭包：写入 error/aborted assistant + 更新 leaf
 	writeErrAssistant := func(content string, status string) string {
@@ -443,6 +494,8 @@ func (s *ConversationService) RetryMessage(
 			Content:        content,
 			Model:          &req.Model,
 			Status:         status,
+			FileURL:        ptrIfNonEmpty(capturedFileURL),
+			FileName:       ptrIfNonEmpty(capturedFileName),
 		}
 		errMsg.ID = assistantMsgID
 		_ = s.conversationRepo.CreateMessage(context.Background(), &errMsg)
@@ -498,7 +551,17 @@ func (s *ConversationService) RetryMessage(
 	aiCtx, aiCancel := context.WithCancel(ctx)
 	defer aiCancel()
 
-	aiCh, err := s.ai.StreamChat(aiCtx, chatMessages, req.Model)
+	chatReq := infra.StreamChatReq{
+		Messages: chatMessages,
+		Model:    req.Model,
+		ToolContext: &infra.ToolContext{
+			UserID:     userID,
+			CanvasID:   conv.CanvasID,
+			ChatNodeID: req.ConversationID,
+			MessageID:  strconv.FormatInt(assistantMsgID, 10),
+		},
+	}
+	aiCh, err := s.ai.StreamChat(aiCtx, chatReq)
 	if err != nil {
 		deferErrMsg = "Failed to call AI service"
 		return
@@ -539,6 +602,37 @@ func (s *ConversationService) RetryMessage(
 				Type: "tool_call",
 				Data: dto.ToolCallData{Content: evt.Content},
 			}
+		case "image_partial":
+			if !firstTokenReceived {
+				firstTokenReceived = true
+				firstTokenTimer.Stop()
+			}
+			eventCh <- dto.SSEEvent{
+				Type: evt.Type,
+				Data: evt.RawData,
+			}
+		case "resource_created":
+			if !firstTokenReceived {
+				firstTokenReceived = true
+				firstTokenTimer.Stop()
+			}
+			// Extract file_url and filename from RawData for persistence
+			var rcData struct {
+				FileURL  string `json:"file_url"`
+				Filename string `json:"filename"`
+			}
+			if err := json.Unmarshal(evt.RawData, &rcData); err == nil {
+				if rcData.FileURL != "" {
+					capturedFileURL = rcData.FileURL
+				}
+				if rcData.Filename != "" {
+					capturedFileName = rcData.Filename
+				}
+			}
+			eventCh <- dto.SSEEvent{
+				Type: evt.Type,
+				Data: evt.RawData,
+			}
 		case "complete":
 			firstTokenTimer.Stop()
 			assistantMsg := model.Message{
@@ -550,6 +644,8 @@ func (s *ConversationService) RetryMessage(
 				Status:           "completed",
 				PromptTokens:     evt.PromptTokens,
 				CompletionTokens: evt.CompletionTokens,
+				FileURL:          ptrIfNonEmpty(capturedFileURL),
+				FileName:         ptrIfNonEmpty(capturedFileName),
 			}
 			assistantMsg.ID = assistantMsgID
 			if err := s.conversationRepo.CreateMessage(ctx, &assistantMsg); err != nil {
@@ -612,6 +708,10 @@ func (s *ConversationService) UpdateCurrentLeaf(
 	}
 
 	return s.conversationRepo.UpdateCurrentLeafID(ctx, conversationID, leafID)
+}
+
+func (s *ConversationService) UpdateMessageTokenUsage(ctx context.Context, messageID int64, promptTokens, completionTokens int) error {
+	return s.conversationRepo.UpdateMessageTokenUsage(ctx, messageID, promptTokens, completionTokens)
 }
 
 // ========== 上下文组装（Phase 3: 并发 + assemblyTimer） ==========
@@ -1603,9 +1703,19 @@ func modelToFullMessage(m model.Message) dto.FullMessage {
 		Status:           m.Status,
 		PromptTokens:     m.PromptTokens,
 		CompletionTokens: m.CompletionTokens,
+		FileURL:          m.FileURL,
+		FileName:         m.FileName,
 		CreatedAt:        m.CreatedAt,
 		UpdatedAt:        m.UpdatedAt,
 	}
+}
+
+// ptrIfNonEmpty returns a pointer to s if non-empty, otherwise nil.
+func ptrIfNonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // isOriginalText 判断是否为原始文本类型（text/* 或 application/json）

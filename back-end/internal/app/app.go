@@ -157,11 +157,12 @@ func (a *App) Close(ctx context.Context) error {
 }
 
 type Handlers struct {
-	AuthHandler *handler.AuthHandler
-	UserHandler *handler.UserHandler
-	CanvasHandler *handler.CanvasHandler
-	FileHandler *handler.FileHandler
+	AuthHandler         *handler.AuthHandler
+	UserHandler         *handler.UserHandler
+	CanvasHandler       *handler.CanvasHandler
+	FileHandler         *handler.FileHandler
 	ConversationHandler *handler.ConversationHandler
+	InternalHandler     *handler.InternalHandler
 }
 
 func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, mq *infra.RabbitMQ, aiClient *infra.AIClient, cfg *config.Config) *Handlers {
@@ -197,13 +198,16 @@ func wireHandlers(db *gorm.DB, rdb *redis.Client, minioClient *minio.Client, mq 
 	conversationService := service.NewConversationService(conversationRepo, canvasRepo, fileRepo, aiClient)
 	conversationHandler := handler.NewConversationHandler(conversationService)
 
+	// Internal (ai-service → Go backend)
+	internalHandler := handler.NewInternalHandler(fileService, conversationService)
 
 	return &Handlers{
-		AuthHandler: authHandler,
-		UserHandler: userHandler,
-		CanvasHandler: canvasHandler,
-		FileHandler: fileHandler,
+		AuthHandler:         authHandler,
+		UserHandler:         userHandler,
+		CanvasHandler:       canvasHandler,
+		FileHandler:         fileHandler,
 		ConversationHandler: conversationHandler,
+		InternalHandler:     internalHandler,
 	}
 }
 

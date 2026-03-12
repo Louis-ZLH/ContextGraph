@@ -42,6 +42,10 @@ class Settings(BaseSettings):
         3: {"provider": "deepseek", "model": "deepseek-chat"},
     }
 
+    # AI file generation — Go backend internal API (used in 15.2)
+    go_backend_internal_url: str = ""   # e.g. "http://backend:8080"
+    internal_token: str = ""             # X-Internal-Token header value
+
     # Redis
     redis_url: str = "redis://127.0.0.1:6379/0"
 

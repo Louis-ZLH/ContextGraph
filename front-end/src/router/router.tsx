@@ -12,6 +12,8 @@ import NewCanvas from "../view/canvas/NewCanvas";
 import MyResource from "../view/canvas/MyResource";
 import SearchCanvases from "../view/canvas/SearchCanvases";
 import GuidePage from "../view/Guide";
+import NotFoundPage from "../view/NotFound";
+import ErrorFallback from "../view/ErrorFallback";
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +46,7 @@ export const router = createBrowserRouter([
       {
         path: "/canvas",
         element: <CanvasLayout />,
+        errorElement: <ErrorFallback />,
         loader: canvasLayoutLoader,
         middleware: [authMiddleware],
         children: [
@@ -73,6 +76,10 @@ export const router = createBrowserRouter([
             element: <MyResource />,
           }
         ],
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />,
       },
     ],
   },

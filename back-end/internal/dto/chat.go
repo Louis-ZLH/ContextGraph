@@ -59,6 +59,8 @@ type Message struct {
 	Content        string    `json:"content"`
 	Model          *int      `json:"model"`
 	Status         string    `json:"status"`
+	FileURL        *string   `json:"file_url,omitempty"`
+	FileName       *string   `json:"file_name,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -141,6 +143,52 @@ type RetryAckEvent struct {
 	AssistantMsgID int64 `json:"assistant_msg_id,string"`
 }
 
+// ---------- AI File Generation (15.2 预定义) ----------
+
+type ImagePartialData struct {
+	B64Image     string `json:"b64_image"`
+	PartialIndex int    `json:"partial_index"`
+	ChatNodeID   string `json:"chat_node_id"`
+	MessageID    string `json:"message_id"`
+}
+
+type ResourceCreatedData struct {
+	FileID      int64  `json:"file_id,string"` // int64 serialized as string to avoid JS precision loss
+	NodeID      string `json:"node_id"`
+	EdgeID      string `json:"edge_id"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"content_type"`
+	ChatNodeID  string `json:"chat_node_id"`
+	MessageID   string `json:"message_id"` // associated assistant message ID
+	Position    Pos    `json:"position"`
+	FileURL     string `json:"file_url"`
+}
+
+type RegisterAIFileRequest struct {
+	UserID      int64  `json:"user_id"`
+	CanvasID    int64  `json:"canvas_id"`
+	ChatNodeID  string `json:"chat_node_id" binding:"required"`
+	MessageID   string `json:"message_id" binding:"required"` // assistant message ID
+	MinioPath   string `json:"minio_path" binding:"required"`
+	Filename    string `json:"filename" binding:"required"`
+	FileSize    int64  `json:"file_size"`
+	ContentType string `json:"content_type" binding:"required"`
+}
+
+type RegisterAIFileResponse struct {
+	FileID   int64  `json:"file_id,string"` // int64 serialized as string
+	NodeID   string `json:"node_id"`
+	EdgeID   string `json:"edge_id"`
+	Position Pos    `json:"position"`
+	FileURL  string `json:"file_url"`
+}
+
+// UpdateMessageUsageRequest 内部接口：更新消息的 token 用量
+type UpdateMessageUsageRequest struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
 // complete / user_message 事件的 data（完整消息，含 token 统计）
 type FullMessage struct {
 	ID               int64     `json:"id,string"`
@@ -152,6 +200,8 @@ type FullMessage struct {
 	Status           string    `json:"status"`
 	PromptTokens     int       `json:"prompt_tokens"`
 	CompletionTokens int       `json:"completion_tokens"`
+	FileURL          *string   `json:"file_url,omitempty"`
+	FileName         *string   `json:"file_name,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }

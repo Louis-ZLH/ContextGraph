@@ -40,6 +40,9 @@ type Config struct {
 	SMTPPassword string
 	SMTPFromName string
 
+	// Internal API 认证（ai-service → Go backend）
+	InternalToken string
+
 	// Cookie 安全配置
 	CookieSecure bool
 }
@@ -75,7 +78,8 @@ func Load() *Config {
 		// RabbitMQ 配置
 		RabbitMQURL: getEnv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:5672/"),
 
-		AIServiceURL: getEnv("AI_SERVICE_URL", "http://localhost:8001"),
+		AIServiceURL:  getEnv("AI_SERVICE_URL", "http://localhost:8001"),
+		InternalToken: getEnv("INTERNAL_TOKEN", "dev-internal-token"),
 
 		// SMTP 配置
 		SMTPHost:     getEnv("SMTP_HOST", "smtp.gmail.com"),

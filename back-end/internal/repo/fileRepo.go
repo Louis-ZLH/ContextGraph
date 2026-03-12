@@ -284,3 +284,86 @@ func (r *FileRepo) ListMinioObjects(ctx context.Context, prefix string) ([]strin
 	}
 	return paths, nil
 }
+
+// ========== AI File Generation (15.2) ==========
+
+// CheckCanvasOwnership 检查用户是否拥有该 canvas
+func (r *FileRepo) CheckCanvasOwnership(ctx context.Context, canvasID int64, userID int64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.Canvas{}).
+		Where("id = ? AND user_id = ?", canvasID, userID).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// CheckNodeBelongsToCanvas 检查 node 是否属于指定 canvas
+func (r *FileRepo) CheckNodeBelongsToCanvas(ctx context.Context, nodeID string, canvasID int64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.Node{}).
+		Where("id = ? AND canvas_id = ?", nodeID, canvasID).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// GetNodeByID 查询节点
+func (r *FileRepo) GetNodeByID(ctx context.Context, nodeID string) (*model.Node, error) {
+	var node model.Node
+	if err := r.db.WithContext(ctx).First(&node, "id = ?", nodeID).Error; err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
+// CountChildEdges 查询指定 source_node_id 的 edge 数量（用于计算 ResourceNode 位置）
+func (r *FileRepo) CountChildEdges(ctx context.Context, sourceNodeID string) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.NodeEdge{}).
+		Where("source_node_id = ?", sourceNodeID).Count(&count).Error
+	return count, err
+}
+
+// CheckAIFileRateLimit 使用 Redis Lua 脚本检查 AI 图片生成频率限制
+// 返回 -1 表示已达上限，正数表示当前计数
+func (r *FileRepo) CheckAIFileRateLimit(ctx context.Context, userID int64) (int64, error) {
+	const script = `
+local current = redis.call("GET", KEYS[1])
+if current and tonumber(current) >= 10 then
+    return -1
+end
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+    redis.call("EXPIRE", KEYS[1], ARGV[1])
+end
+return count
+`
+	key := fmt.Sprintf("ai_image_gen:rate_limit:%d", userID)
+	result, err := r.rdb.Eval(ctx, script, []string{key}, 86400).Int64()
+	if err != nil {
+		return 0, err
+	}
+	return result, nil
+}
+
+// CreateFileRecordInTx 在事务中创建文件记录
+func (r *FileRepo) CreateFileRecordInTx(tx *gorm.DB, fileRecord *model.File) error {
+	return tx.Create(fileRecord).Error
+}
+
+// CreateNodeInTx 在事务中创建节点
+func (r *FileRepo) CreateNodeInTx(tx *gorm.DB, node *model.Node) error {
+	return tx.Create(node).Error
+}
+
+// CreateNodeEdgeInTx 在事务中创建边
+func (r *FileRepo) CreateNodeEdgeInTx(tx *gorm.DB, edge *model.NodeEdge) error {
+	return tx.Create(edge).Error
+}
+
+// GetDB 暴露 DB 实例（用于事务）
+func (r *FileRepo) GetDB() *gorm.DB {
+	return r.db
+}

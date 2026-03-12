@@ -118,3 +118,25 @@ export interface BackendNode {
     position: { x: number; y: number };
     fileId?: string;
 }
+
+// AI 文件生成相关 SSE 事件数据
+export interface ImagePartialData {
+    type?: string;  // Go transparently passes RawData which includes redundant type field
+    b64_image: string;
+    partial_index: number;
+    chat_node_id: string;
+    message_id: string;
+}
+
+export interface ResourceCreatedData {
+    type?: string;  // Same as above, redundant field from Go RawData passthrough
+    file_id: string;  // int64 snowflake ID, Go serializes as string via json:"file_id,string"
+    node_id: string;
+    edge_id: string;
+    filename: string;
+    content_type: string;
+    chat_node_id: string;
+    message_id: string;  // associated assistant message ID
+    position: { x: number; y: number };
+    file_url: string;  // File access URL for all file types
+}

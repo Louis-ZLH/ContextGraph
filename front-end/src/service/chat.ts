@@ -1,6 +1,6 @@
 import { apiRequest } from "../util/api";
 import { toCamelCase } from "../util/transform";
-import type { JSONResponse, DTONodeReadyToSend } from "./type";
+import type { JSONResponse, DTONodeReadyToSend, ImagePartialData, ResourceCreatedData } from "./type";
 import type { Message, Conversation } from "../feature/chat/types";
 import { BASE_URL } from "../util/api";
 
@@ -30,6 +30,8 @@ export interface StreamCallbacks {
     onAbort: (messageId: string | null) => void;
     onStatusChange?: (text: string) => void;
     onTitle?: (title: string) => void;
+    onImagePartial?: (data: ImagePartialData) => void;
+    onResourceCreated?: (data: ResourceCreatedData) => void;
 }
 
 interface SSEEventHandler {
@@ -145,6 +147,13 @@ export function sendMessageStream(
                             break;
                         case "title":
                             callbacks.onTitle?.(event.data.title as string);
+                            break;
+                        case "image_partial":
+                            messageId = (event.data as unknown as ImagePartialData).message_id;
+                            callbacks.onImagePartial?.(event.data as unknown as ImagePartialData);
+                            break;
+                        case "resource_created":
+                            callbacks.onResourceCreated?.(event.data as unknown as ResourceCreatedData);
                             break;
                         case "error":
                             // user 落库后，后端始终写入 error assistant 并通过 message_id 传回

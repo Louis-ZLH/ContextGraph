@@ -1,11 +1,13 @@
-import { useState, memo } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { useState, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
+import { Handle, Position, useNodeConnections } from "@xyflow/react";
 import {
   FileImage,
   Loader2,
   AlertCircle,
   X,
   Download,
+  ZoomIn,
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import type { NodeData, FileCategory } from "../../../feature/canvas/canvasSlice";
@@ -18,6 +20,8 @@ import { getFileExtLabel } from "./utils";
 
 function ResourceNode({ id, data, selected }: { id: string; data: NodeData; selected?: boolean }) {
   const dispatch = useDispatch();
+  const incomingConnections = useNodeConnections({ handleType: "target" });
+  const hasIncomingEdge = incomingConnections.length > 0;
   const fileId: string | undefined = data?.fileId ?? undefined;
   const status = fileId === "__error__" ? "error"
     : String(fileId) === "-1" ? "deleted"
@@ -53,6 +57,20 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
   const extLabel = getFileExtLabel(fileName);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [lightboxOpen]);
 
   return (
     <div className={`source-node rounded-xl flex flex-col w-[230px] text-xs ${selected ? "node-selected" : ""}`}>
@@ -61,7 +79,7 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
         <div className="flex items-center gap-2">
           <FileTypeIcon fileType={fileType} size={12} />
           <span className="text-xs font-bold uppercase tracking-wider text-secondary">
-            Source
+            {hasIncomingEdge ? "Generated" : "Source"}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -133,7 +151,7 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
             {/* 图片类型：直接展示预览 */}
             {isImage && resourceUrl && !imgError ? (
               <div className="flex flex-col gap-2">
-                <div className="rounded-md overflow-hidden border border-main relative">
+                <div className="rounded-md overflow-hidden border border-main relative group cursor-pointer nodrag nopan" onClick={() => setLightboxOpen(true)}>
                   {/* 图片加载中的骨架占位 */}
                   {!imgLoaded && (
                     <div className="w-full h-[140px] source-skeleton" />
@@ -148,6 +166,9 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
                     onError={() => setImgError(true)}
                     draggable={false}
                   />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-200">
+                    <ZoomIn size={22} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg" />
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <FileImage size={14} className="source-meta-icon shrink-0" />
@@ -157,6 +178,38 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
                 </div>
                 {fileSize != null && (
                   <p className="text-[11px] text-secondary">{formatFileSize(fileSize)}</p>
+                )}
+                {lightboxOpen && createPortal(
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={() => setLightboxOpen(false)}>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <img
+                      src={resourceUrl}
+                      alt={fileName}
+                      className="relative max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                      draggable={false}
+                    />
+                    <div className="absolute top-4 right-4 flex items-center gap-2">
+                      {downloadUrl && (
+                        <a
+                          href={downloadUrl}
+                          className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+                          title="Download"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download size={20} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setLightboxOpen(false)}
+                        className="p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors cursor-pointer"
+                        title="Close"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             ) : (
@@ -215,6 +268,13 @@ function ResourceNode({ id, data, selected }: { id: string; data: NodeData; sele
       </div>
 
       {/* ── Handles ── */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+        className={`custom-handle custom-handle-target ${hasIncomingEdge ? "" : "handle-hidden"}`}
+        style={{ top: 20, left: -8 }}
+      />
       <Handle
         type="source"
         position={Position.Right}

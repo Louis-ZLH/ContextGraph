@@ -88,6 +88,9 @@ services:
       # Tool APIs
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       JINA_API_KEY: ${JINA_API_KEY:-}
+      # AI file generation — Go backend internal API (15.2)
+      GO_BACKEND_INTERNAL_URL: http://back-end-1:8080
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
 
   # 6. Back-End 实例 1 (Go Gin)
   back-end-1:
@@ -118,6 +121,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: context-graph
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -153,6 +157,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: context-graph
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

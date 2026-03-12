@@ -1,143 +1,18 @@
 import { Sparkles, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Loader2 } from "lucide-react";
-import MarkdownRenderer from "../../../MarkdownRenderer";
-import type { ThemeName } from "../../../../feature/user/userSlice";
-import type { Message } from "../../../../feature/chat/types";
-import BranchNavigator from "./BranchNavigator";
-import ErrorBlock from "./ErrorBlock";
-import { useCallback, useContext, useEffect, useRef, useState, memo } from "react";
-import { streamContext } from "../index";
-import { modelsContext } from "../index";
+import MarkdownRenderer from "../../../../MarkdownRenderer";
+import type { ThemeName } from "../../../../../feature/user/userSlice";
+import type { Message, GeneratedFile, ImagePreviewState } from "../../../../../feature/chat/types";
+import BranchNavigator from "../BranchNavigator";
+import ErrorBlock from "../ErrorBlock";
+import { useCallback, useContext, useState, memo } from "react";
+import { streamContext, modelsContext } from "../../index";
 import { useSelector, shallowEqual } from "react-redux";
-import { selectParentMessageById } from "../../../../feature/chat/chatSlice";
-import type { RootState } from "../../../../store";
-
-const MIN_CHARS = 1;
-const DRAIN_FRAMES = 8;
-const MIN_INTERVAL = 40; // ms between advances — slower cadence for slow models
-const HOLD_MS = 500;     // hold a lone first char, wait for more to accumulate
-
-function useStreamingBuffer(content: string, isStreaming: boolean): string {
-  const [displayed, setDisplayed] = useState(content);
-  const posRef = useRef(content.length);
-  const rafRef = useRef(0);
-  const lastTickRef = useRef(0);
-  const idleRef = useRef(true);
-  const holdStartRef = useRef(0);
-
-  useEffect(() => {
-    if (!isStreaming) {
-      cancelAnimationFrame(rafRef.current);
-      posRef.current = content.length;
-      idleRef.current = true;
-      return;
-    }
-
-    const tick = (now: number) => {
-      const remaining = content.length - posRef.current;
-
-      if (remaining <= 0) {
-        idleRef.current = true;
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      // Transition from idle: start hold timer
-      if (idleRef.current) {
-        idleRef.current = false;
-        holdStartRef.current = now;
-      }
-
-      // Hold lone char: wait for more to arrive or timeout
-      if (remaining === 1 && now - holdStartRef.current < HOLD_MS) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      if (now - lastTickRef.current >= MIN_INTERVAL) {
-        const step = Math.max(MIN_CHARS, Math.ceil(remaining / DRAIN_FRAMES));
-        posRef.current = Math.min(posRef.current + step, content.length);
-        setDisplayed(content.slice(0, posRef.current));
-        lastTickRef.current = now;
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [content, isStreaming]);
-
-  return isStreaming ? displayed : content;
-}
-
-/**
- * WaitingStatus: 显示等待阶段的状态文本，支持字符波浪过渡动画。
- * - 无 statusText 时不渲染
- * - 文本变化时，旧文本执行从左到右的字符跳动，完成后切换为新文本
- */
-const WaitingStatus = memo(function WaitingStatus({ statusText }: { statusText?: string }) {
-  const [visibleText, setVisibleText] = useState("");
-  const [targetText, setTargetText] = useState("");
-  const [waving, setWaving] = useState(false);
-  const targetTextRef = useRef("");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const incoming = statusText ?? "";
-
-  // 首次文本：直接显示（渲染阶段同步）
-  if (visibleText === "" && incoming !== "") {
-    setVisibleText(incoming);
-    setTargetText(incoming);
-  }
-
-  // 新文本到达：更新目标，若未在波浪中则启动
-  if (visibleText !== "" && incoming !== targetText) {
-    setTargetText(incoming);
-    if (!waving) {
-      setWaving(true);
-    }
-  }
-
-  // 同步 ref 以便 setTimeout 回调读取最新值
-  useEffect(() => {
-    targetTextRef.current = targetText;
-  }, [targetText]);
-
-  // 波浪动画计时器
-  useEffect(() => {
-    if (!waving) return;
-
-    const charCount = visibleText.length;
-    const duration = charCount * 10 + 150;
-
-    timerRef.current = setTimeout(() => {
-      setVisibleText(targetTextRef.current);
-      setWaving(false);
-    }, duration);
-
-    return () => clearTimeout(timerRef.current);
-  }, [waving, visibleText]);
-
-  useEffect(() => {
-    return () => clearTimeout(timerRef.current);
-  }, []);
-
-  if (!visibleText) return null;
-
-  return (
-    <span className="text-xs inline-flex flex-wrap" style={{ color: "var(--text-secondary)" }}>
-      {visibleText.split("").map((char, i) => (
-        <span
-          key={`${visibleText}-${i}`}
-          className={waving ? "status-char-wave" : ""}
-          style={waving ? { animationDelay: `${i * 10}ms` } : undefined}
-        >
-          {char === " " ? "\u00A0" : char}
-        </span>
-      ))}
-    </span>
-  );
-});
+import { selectParentMessageById } from "../../../../../feature/chat/chatSlice";
+import type { RootState } from "../../../../../store";
+import { BASE_URL } from "../../../../../util/api";
+import { useStreamingBuffer } from "./useStreamingBuffer";
+import WaitingStatus from "./WaitingStatus";
+import FileCard from "./FileCard";
 
 interface AssistantMessageProps {
   message: Message;
@@ -153,6 +28,8 @@ function AssistantMessage({ message, theme, hasBranches, current, total, ref }: 
   const { modelIndex } = useContext(modelsContext)!;
   const parentMessage = useSelector((state: RootState) => selectParentMessageById(state, message.id), shallowEqual);
   const currentLeafId = useSelector((state: RootState) => state.chat.conversations[message.conversationId]?.currentLeafId);
+  const imagePreview = useSelector((state: RootState) => state.chat.imagePreviews[message.id] as ImagePreviewState | undefined);
+  const generatedFiles = message.metadata?.generatedFiles as GeneratedFile[] | undefined;
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"good" | "bad" | null>(null);
   const [hovered, setHovered] = useState(false);
@@ -177,8 +54,6 @@ function AssistantMessage({ message, theme, hasBranches, current, total, ref }: 
     send(null, modelIndex, parentMessage.id as string, true, parentMessage.id);
   }, [parentMessage, send, modelIndex]);
 
-  if (message.status === "aborted" && !message.content) return null;
-
   const isEmptyError = message.status === "error" && !message.content;
 
   return (
@@ -195,13 +70,20 @@ function AssistantMessage({ message, theme, hasBranches, current, total, ref }: 
             {!isWaiting && (
               <div className={`cursor-text${isStreaming ? " streaming-content" : ""}`}>
                 <MarkdownRenderer content={displayedContent} theme={theme} id={message.id} />
-                {/* {isStreaming && (
-                  <span
-                    className="inline-block w-[2px] h-[14px] ml-0.5 align-middle animate-pulse"
-                    style={{ backgroundColor: "var(--text-primary, currentColor)" }}
-                  />
-                )} */}
               </div>
+            )}
+            {/* Three-state file card rendering */}
+            {/* State 1: Streaming base64 preview (image_partial phase) */}
+            {imagePreview && (
+              <FileCard src={`data:image/jpeg;base64,${imagePreview.b64Image}`} isPreview />
+            )}
+            {/* State 2: Stream complete — render from metadata.generatedFiles */}
+            {!imagePreview && generatedFiles && generatedFiles.length > 0 && generatedFiles.map((f) => (
+              <FileCard key={f.fileId} src={`${BASE_URL}/api/file/${f.fileId}`} filename={f.filename} />
+            ))}
+            {/* State 3: History load — render from message.fileUrl + fileName */}
+            {!imagePreview && !generatedFiles?.length && message.fileUrl && (
+              <FileCard src={message.fileUrl} filename={message.fileName} />
             )}
             {(isWaiting || (isStreaming && message.statusText)) && (
               <div className="flex items-center gap-2 py-1">

@@ -25,9 +25,17 @@ class ChatMessage(BaseModel):
     content: str | list[ContentBlock]  # str for plain text, list for multimodal
 
 
+class ToolContextSchema(BaseModel):
+    user_id: int
+    canvas_id: int   # Go sends as JSON integer (int64), backend internal communication — no string encoding
+    chat_node_id: str
+    message_id: str  # assistant message ID
+
+
 class StreamChatRequest(BaseModel):
     messages: list[ChatMessage]  # Full message thread built by Go backend
     model: int = 0  # Model index 0-3
+    tool_context: ToolContextSchema | None = None  # Optional, Go doesn't send in 15.1
 
 
 class GenerateSummaryRequest(BaseModel):

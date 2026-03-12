@@ -49,6 +49,19 @@ export const CanvasControls = memo(function CanvasControls({ onLayout, onAddNode
               style={{ fill: "var(--edge-stroke)" }}
             />
           </marker>
+          <marker
+            id="generation-arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon
+              points="0 0, 8 3, 0 6"
+              style={{ fill: "var(--gen-edge-stroke)", opacity: 0.7 }}
+            />
+          </marker>
         </defs>
       </svg>
 

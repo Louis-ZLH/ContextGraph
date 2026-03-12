@@ -15,12 +15,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/luhao/contextGraph/internal/dto"
 	"github.com/luhao/contextGraph/internal/model"
 	apperr "github.com/luhao/contextGraph/pkg/errors"
+	"github.com/luhao/contextGraph/pkg/idgen"
 	"github.com/minio/minio-go/v7"
 	pdfcpuapi "github.com/pdfcpu/pdfcpu/pkg/api"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
+	"gorm.io/gorm"
 )
 
 const (
@@ -87,6 +90,17 @@ type FileRepo interface {
 	DeleteFileByID(ctx context.Context, fileID int64) error
 	RemoveMinioObject(ctx context.Context, minioPath string) error
 	GetUserStorageUsed(ctx context.Context, userID int64) (int64, error)
+
+	// AI File Generation (15.2)
+	CheckCanvasOwnership(ctx context.Context, canvasID int64, userID int64) (bool, error)
+	CheckNodeBelongsToCanvas(ctx context.Context, nodeID string, canvasID int64) (bool, error)
+	GetNodeByID(ctx context.Context, nodeID string) (*model.Node, error)
+	CountChildEdges(ctx context.Context, sourceNodeID string) (int64, error)
+	CheckAIFileRateLimit(ctx context.Context, userID int64) (int64, error)
+	CreateFileRecordInTx(tx *gorm.DB, fileRecord *model.File) error
+	CreateNodeInTx(tx *gorm.DB, node *model.Node) error
+	CreateNodeEdgeInTx(tx *gorm.DB, edge *model.NodeEdge) error
+	GetDB() *gorm.DB
 }
 
 type FileService struct {
@@ -439,4 +453,129 @@ func isAllowedMIME(mime string) bool {
 		}
 	}
 	return false
+}
+
+// ========== AI File Generation (15.2) ==========
+
+// RegisterAIGeneratedFile registers an AI-generated file: checks rate limit, storage quota,
+// creates File record + ResourceNode + NodeEdge in a single DB transaction.
+func (s *FileService) RegisterAIGeneratedFile(
+	ctx context.Context,
+	userID int64,
+	canvasID int64,
+	chatNodeID string,
+	messageID string,
+	minioPath string,
+	filename string,
+	fileSize int64,
+	contentType string,
+) (fileID int64, nodeID string, edgeID string, position dto.Pos, fileURL string, err error) {
+	// 1. Auth: user_id owns canvas_id
+	owned, err := s.repo.CheckCanvasOwnership(ctx, canvasID, userID)
+	if err != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to check canvas ownership")
+	}
+	if !owned {
+		return 0, "", "", dto.Pos{}, "", apperr.Forbidden("User does not have access to this canvas")
+	}
+
+	// Auth: chat_node_id belongs to this canvas
+	belongs, err := s.repo.CheckNodeBelongsToCanvas(ctx, chatNodeID, canvasID)
+	if err != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to check node ownership")
+	}
+	if !belongs {
+		return 0, "", "", dto.Pos{}, "", apperr.Forbidden("Chat node does not belong to this canvas")
+	}
+
+	// 2. Rate limit (Redis Lua script, 10/24h) — only for raster image generation (exclude SVG)
+	if strings.HasPrefix(contentType, "image/") && contentType != "image/svg+xml" {
+		count, err := s.repo.CheckAIFileRateLimit(ctx, userID)
+		if err != nil {
+			return 0, "", "", dto.Pos{}, "", apperr.InternalError("Rate limit check failed")
+		}
+		if count < 0 {
+			return 0, "", "", dto.Pos{}, "", apperr.New(429, apperr.BizFrequentRequest, "Daily image generation limit reached (10/10). Please try again tomorrow.")
+		}
+	}
+
+	// 3. Storage quota
+	used, err := s.repo.GetUserStorageUsed(ctx, userID)
+	if err != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to query storage usage")
+	}
+	if used+fileSize > maxStoragePerUser {
+		return 0, "", "", dto.Pos{}, "", apperr.New(507, apperr.BizForbidden, "Storage quota exceeded (200MB). Please delete some files and try again.")
+	}
+
+	// 4. Query ChatNode position + child count for auto-positioning
+	chatNode, err := s.repo.GetNodeByID(ctx, chatNodeID)
+	if err != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to query chat node")
+	}
+	childCount, err := s.repo.CountChildEdges(ctx, chatNodeID)
+	if err != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to count child edges")
+	}
+
+	// Calculate ResourceNode position: right-below offset from ChatNode
+	posX := chatNode.PosX + 400
+	posY := chatNode.PosY + 100 + float64(childCount)*150
+
+	// Generate IDs
+	fileID = idgen.GenID()
+	nodeID = idgen.GenNanoID()
+	edgeID = idgen.GenNanoID()
+
+	// 5-8. DB transaction: create File + ResourceNode + NodeEdge
+	db := s.repo.GetDB()
+	txErr := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 5. Create File record
+		fileRecord := &model.File{
+			UserID:      userID,
+			MinioPath:   minioPath,
+			Filename:    filename,
+			FileSize:    fileSize,
+			ContentType: contentType,
+		}
+		fileRecord.ID = fileID
+		if err := s.repo.CreateFileRecordInTx(tx, fileRecord); err != nil {
+			return fmt.Errorf("create file record: %w", err)
+		}
+
+		// 6. Create ResourceNode
+		node := &model.Node{
+			ID:       nodeID,
+			CanvasID: canvasID,
+			NodeType: "resourceNode",
+			PosX:     posX,
+			PosY:     posY,
+			FileID:   &fileID,
+		}
+		if err := s.repo.CreateNodeInTx(tx, node); err != nil {
+			return fmt.Errorf("create resource node: %w", err)
+		}
+
+		// 7. Create NodeEdge (ChatNode → ResourceNode)
+		edge := &model.NodeEdge{
+			ID:           edgeID,
+			CanvasID:     canvasID,
+			SourceNodeID: chatNodeID,
+			TargetNodeID: nodeID,
+		}
+		if err := s.repo.CreateNodeEdgeInTx(tx, edge); err != nil {
+			return fmt.Errorf("create node edge: %w", err)
+		}
+
+		return nil
+	})
+	if txErr != nil {
+		return 0, "", "", dto.Pos{}, "", apperr.InternalError("Failed to register AI generated file")
+	}
+
+	// 9. Construct fileURL for all file types
+	fileURL = fmt.Sprintf("/api/file/%d", fileID)
+
+	position = dto.Pos{X: posX, Y: posY}
+	return fileID, nodeID, edgeID, position, fileURL, nil
 }

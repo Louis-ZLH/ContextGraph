@@ -125,6 +125,10 @@
   --edge-width: 2;
   --edge-dasharray: none;
 
+  --gen-edge-stroke: #3b82f6;
+  --gen-edge-opacity: 0.7;
+  --gen-edge-width: 2.5;
+
   --code-block-bg: #ffffff;
   --code-header-bg: #f9fafb;
 
@@ -163,6 +167,10 @@
   --edge-width: 1.5;
   --edge-dasharray: none;
 
+  --gen-edge-stroke: #9ca3af;
+  --gen-edge-opacity: 0.7;
+  --gen-edge-width: 2.5;
+
   /* NProgress Dark */
   --nprogress-color: #ececec;
   --nprogress-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
@@ -193,6 +201,10 @@
   --edge-opacity: 1;
   --edge-width: 1.5;
   --edge-dasharray: 5 5;
+
+  --gen-edge-stroke: #ea580c;
+  --gen-edge-opacity: 0.8;
+  --gen-edge-width: 2;
 
   --code-block-bg: #ffffff;
   --code-header-bg: #f9f8f5;
@@ -446,6 +458,23 @@ body {
 
 .custom-handle-target:hover::after {
   opacity: 1;
+}
+
+.handle-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============ Generation Edge Flow Animation ============ */
+.gen-edge-flow {
+  stroke-dasharray: 8 6;
+  animation: gen-edge-flow 0.8s linear infinite;
+}
+
+@keyframes gen-edge-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
 }
 
 /* ============ Streaming Fade-in ============ */

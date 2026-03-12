@@ -52,3 +52,9 @@ def write_file(object_name: str, data: bytes, content_type: str = "application/o
 def write_text_file(object_name: str, text: str) -> None:
     """Write a text string to MinIO as UTF-8."""
     write_file(object_name, text.encode("utf-8"), content_type="text/plain; charset=utf-8")
+
+
+def delete_file(path: str) -> None:
+    """Delete a file from MinIO."""
+    client = get_minio_client()
+    client.remove_object(settings.minio_bucket, path)

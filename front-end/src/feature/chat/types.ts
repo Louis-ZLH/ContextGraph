@@ -1,6 +1,7 @@
 export interface ChatState {
     conversations: Record<string, Conversation>; // node_id -> Conversation
     messages: Record<string, Message>; // message_id -> Message
+    imagePreviews: Record<string, ImagePreviewState>; // messageId -> 临时 base64 预览状态，支持多图并发生成
 }
 
 export interface Conversation {
@@ -25,5 +26,18 @@ export interface Message {
     metadata: Record<string, unknown>;
     error?: string;
     statusText?: string;
+    fileUrl?: string;  // Persisted URL for AI-generated files (all types), used for history rendering
+    fileName?: string;  // Persisted filename for file type detection in history rendering
   }
   // root message不会展示，只是方便管理
+
+export interface GeneratedFile {
+    fileId: string;
+    filename: string;
+    contentType: string;
+}
+
+export interface ImagePreviewState {
+    messageId: string;
+    b64Image: string; // 当前最新的 partial base64
+}

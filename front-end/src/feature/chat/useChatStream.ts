@@ -1,12 +1,14 @@
 import { useDispatch, useStore } from "react-redux";
 import { sendMessageStream } from "../../service/chat";
 import type { Message } from "./types";
-import { addUserMessage, addAssistantPlaceholder, confirmUserMessage, confirmAssistantMessage, removeAssistantPlaceholder, appendStreamToken, completeStream, errorStream, abortStream, errorUserMessage, updateWaitingStatus, updateConversationTitle } from "./chatSlice";
+import { addUserMessage, addAssistantPlaceholder, confirmUserMessage, confirmAssistantMessage, removeAssistantPlaceholder, appendStreamToken, completeStream, errorStream, abortStream, errorUserMessage, updateWaitingStatus, updateConversationTitle, setImagePreview, clearImagePreview, addGeneratedFileToMessage } from "./chatSlice";
+import { addGeneratedResource } from "../canvas/canvasSlice";
 import { useRef, useCallback, useState } from "react";
 import type { RootState } from "../../store";
 import { computeParentDelta } from "../canvas/canvasOps";
 import { convertNodeToSendStructure } from "../../service/canvas";
 import toast from "react-hot-toast";
+import type { ImagePartialData, ResourceCreatedData } from "../../service/type";
 
 // 定时批处理：攒 token，每 100ms dispatch 一次（~10次/秒）
 const FLUSH_INTERVAL = 50;
@@ -123,7 +125,7 @@ export function useChatStream(conversationId: string) {
             },
             onComplete: (message: Message) => {
                 flushTokenBuffer();
-                dispatch(completeStream({ msgId: message.id, content: message.content ?? "" }));
+                dispatch(completeStream({ msgId: message.id, content: message.content ?? "", fileUrl: message.fileUrl, fileName: message.fileName }));
                 setIsStreaming(false);
             },
             onError: (messageId: string | null, _UserMsgId: string | null, error: Error) => {
@@ -161,12 +163,56 @@ export function useChatStream(conversationId: string) {
             onTitle: (title: string) => {
                 dispatch(updateConversationTitle({ conversationId, title }));
             },
+            onImagePartial: (data: ImagePartialData) => {
+                // image_partial 可能在首个 token 之前到达（AI 先调 tool 再生成文字），
+                // 此时 assistant 消息仍以 tempAsstId 存储，需先 confirm 以切换到真实 ID
+                if (!streamCtxRef.current) {
+                    if (confirmUserMsgRef.current) {
+                        const { tempMsgId: uTempId, msgId: uRealId } = confirmUserMsgRef.current;
+                        if (uTempId && uRealId) {
+                            dispatch(confirmUserMessage({ conversationId, tempMsgId: uTempId, msgId: uRealId }));
+                        }
+                    }
+                    dispatch(confirmAssistantMessage({ conversationId, tempMsgId: tempAsstId, msgId: data.message_id }));
+                    streamCtxRef.current = { UserMsgId: confirmUserMsgRef.current?.msgId ?? "", msgId: data.message_id };
+                }
+                dispatch(setImagePreview({ messageId: data.message_id, b64Image: data.b64_image }));
+            },
+            onResourceCreated: (data: ResourceCreatedData) => {
+                // resource_created 同样可能在首个 token 之前到达
+                if (!streamCtxRef.current) {
+                    if (confirmUserMsgRef.current) {
+                        const { tempMsgId: uTempId, msgId: uRealId } = confirmUserMsgRef.current;
+                        if (uTempId && uRealId) {
+                            dispatch(confirmUserMessage({ conversationId, tempMsgId: uTempId, msgId: uRealId }));
+                        }
+                    }
+                    dispatch(confirmAssistantMessage({ conversationId, tempMsgId: tempAsstId, msgId: data.message_id }));
+                    streamCtxRef.current = { UserMsgId: confirmUserMsgRef.current?.msgId ?? "", msgId: data.message_id };
+                }
+                // 1. Clear temporary base64 preview
+                dispatch(clearImagePreview(data.message_id));
+                // 2. Add file to message metadata for in-stream rendering
+                dispatch(addGeneratedFileToMessage({
+                    msgId: data.message_id,
+                    file: { fileId: data.file_id, filename: data.filename, contentType: data.content_type },
+                }));
+                // 3. Add ResourceNode + Edge to canvas (no pendingDelta, backend already persisted)
+                dispatch(addGeneratedResource({
+                    nodeId: data.node_id,
+                    edgeId: data.edge_id,
+                    chatNodeId: data.chat_node_id,
+                    fileId: data.file_id,
+                    position: data.position,
+                }));
+            },
             onAbort: (messageId: string | null) => {
                 flushTokenBuffer();
 
                 if (streamCtxRef.current) {
-                    // abort3: 首 token 已到达，confirmAssistantMessage 已在 onToken 中完成
-                    dispatch(abortStream({ msgId: messageId! }));
+                    // abort3: 首 token 或 image_partial 已到达，confirmAssistantMessage 已完成
+                    const realMsgId = messageId ?? streamCtxRef.current.msgId;
+                    dispatch(abortStream({ msgId: realMsgId }));
                 } else if (confirmUserMsgRef.current) {
                     // abort2: send user 已落库 / retry 已过验证 → 预传的 assistantMsgId 可用
                     const { tempMsgId: uTempId, msgId: uRealId, assistantMsgId: asstId } = confirmUserMsgRef.current;

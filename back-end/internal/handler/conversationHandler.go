@@ -123,6 +123,8 @@ func (h *ConversationHandler) GetConversationHistory(c *gin.Context) {
 			Content:        message.Content,
 			Model:          message.Model,
 			Status:         message.Status,
+			FileURL:        message.FileURL,
+			FileName:       message.FileName,
 			CreatedAt:      message.CreatedAt,
 			UpdatedAt:      message.UpdatedAt,
 		}

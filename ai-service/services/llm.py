@@ -14,6 +14,7 @@ from openai import AsyncOpenAI
 
 from config import settings
 from services import tool_executor
+from services.tool_executor import ImageGenUsage, ImagePartialEvent, ResourceCreatedEvent, ToolContext
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,14 @@ in this order: (1) newer data over older data, (2) official/primary \
 sources (government sites, league official sites, company blogs) over \
 reposts/aggregators, (3) reposts/aggregators over informal/user-generated \
 content. Always cite and base your answer on the highest-priority sources.
+
+## File Generation
+- You have access to file generation tools (create_image, create_file). \
+During each user message's response process (including all intermediate \
+tool call rounds), you may call at most ONE file generation tool \
+(create_image or create_file). If the user asks for multiple files or \
+images, generate one per user message and guide them to request the \
+rest in follow-up messages.
 
 ## Accuracy & Honesty
 - Be direct and honest. Do not use ungrounded flattery or sycophancy. \
@@ -536,7 +545,60 @@ _TOOL_DEFINITIONS = [
             "required": ["url"],
         },
     },
+    {
+        "name": "create_image",
+        "description": (
+            "Generate an image based on a text description. Use this when the user asks you to "
+            "create, draw, generate, or design an image, illustration, diagram, or visual content. "
+            "Only call ONE file-generation tool (create_image or create_file) per user request — "
+            "do not call any file-generation tool again in subsequent rounds of the same request. "
+            "If the user wants multiple files, generate one per user message. "
+            "Returns a file_id that will be displayed to the user automatically."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Detailed description of the image to generate, in English for best results",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Suggested filename without extension, e.g. 'sunset_landscape'",
+                },
+            },
+            "required": ["prompt", "filename"],
+        },
+    },
+    {
+        "name": "create_file",
+        "description": (
+            "Create a downloadable file with the given content. Use this when the user asks you to "
+            "create, generate, or export a file such as SVG, Markdown, CSV, JSON, or plain text. "
+            "Do NOT use this for HTML files — output HTML as a code block instead. "
+            "Only call ONE file-generation tool (create_image or create_file) per user request — "
+            "do not call any file-generation tool again in subsequent rounds of the same request. "
+            "Keep file content under 10MB. Returns a file_id that will be displayed to the user automatically."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "Full filename with extension, e.g. 'report.md', 'chart.svg', 'data.csv'",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The complete file content as a string",
+                },
+            },
+            "required": ["filename", "content"],
+        },
+    },
 ]
+
+
+_FILE_GEN_TOOLS = {"create_image", "create_file"}
 
 
 def _claude_tools() -> list[dict]:
@@ -585,6 +647,10 @@ def _tool_call_description(name: str, arguments: dict) -> str:
         return f"Web Searching: {arguments.get('query', '')}"
     if name == "url_reader":
         return f"Reading: {arguments.get('url', '')}"
+    if name == "create_image":
+        return f"Creating: {arguments.get('filename', 'image')}"
+    if name == "create_file":
+        return f"Creating: {arguments.get('filename', 'file')}"
     return f"Calling: {name}"
 
 
@@ -592,8 +658,8 @@ def _tool_call_description(name: str, arguments: dict) -> str:
 
 
 async def _stream_chat_claude(
-    messages: list[dict], model: str, identity_prompt: str
-) -> AsyncGenerator[str | TokenUsage | ToolCallEvent, None]:
+    messages: list[dict], model: str, identity_prompt: str, tool_context: ToolContext | None = None
+) -> AsyncGenerator[str | TokenUsage | ToolCallEvent | ImagePartialEvent | ResourceCreatedEvent, None]:
     client = _get_claude_client()
     system, chat_messages = _extract_system_and_messages(messages)
     if identity_prompt:
@@ -603,7 +669,9 @@ async def _stream_chat_claude(
 
     tools = _claude_tools()
     total_prompt_tokens = 0
+    total_completion_tokens = 0
     start_time = time.monotonic()
+    file_gen_used = False  # cross-round tracking: only one file gen per user turn
 
     for round_idx in range(_MAX_TOOL_ROUNDS):
         if time.monotonic() - start_time > _TOOL_LOOP_TIMEOUT:
@@ -634,9 +702,10 @@ async def _stream_chat_claude(
         if not tool_use_blocks:
             # Final round — no tool calls
             total_prompt_tokens += round_usage.prompt_tokens
+            total_completion_tokens += round_usage.completion_tokens
             yield TokenUsage(
                 prompt_tokens=total_prompt_tokens,
-                completion_tokens=round_usage.completion_tokens,
+                completion_tokens=total_completion_tokens,
             )
             return
 
@@ -664,17 +733,54 @@ async def _stream_chat_claude(
         for block in tool_use_blocks:
             yield ToolCallEvent(content=_tool_call_description(block.name, block.input))
 
-        # Execute tools in parallel
-        results = await asyncio.gather(*[
-            tool_executor.execute(block.name, block.input)
-            for block in tool_use_blocks
-        ])
+        # Filter file generation tools (only one per user turn)
+        allowed_blocks = []
+        skipped_results: list[dict] = []
+        for block in tool_use_blocks:
+            if block.name in _FILE_GEN_TOOLS:
+                if file_gen_used:
+                    skipped_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": "Skipped: only one file generation allowed per request.",
+                    })
+                    continue
+                file_gen_used = True
+            allowed_blocks.append(block)
 
-        # Build tool_result message (all results in one user message for Claude)
-        tool_results: list[dict] = [
-            {"type": "tool_result", "tool_use_id": block.id, "content": result}
-            for block, result in zip(tool_use_blocks, results)
-        ]
+        # Separate streaming and non-streaming tools
+        streaming_tools = [b for b in allowed_blocks if b.name == "create_image"]
+        normal_tools = [b for b in allowed_blocks if b.name != "create_image"]
+
+        tool_results: list[dict] = []
+
+        # 1. Execute non-streaming tools in parallel
+        if normal_tools:
+            results = await asyncio.gather(*[
+                tool_executor.execute(block.name, block.input, tool_context)
+                for block in normal_tools
+            ])
+            for block, (result_text, side_events) in zip(normal_tools, results):
+                for e in side_events:
+                    yield e
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result_text})
+
+        # 2. Execute streaming tools serially
+        for block in streaming_tools:
+            result_text = ""
+            async for event in tool_executor.create_image_stream(block.input, tool_context):
+                if isinstance(event, str):
+                    result_text = event
+                elif isinstance(event, ImageGenUsage):
+                    total_prompt_tokens += event.input_tokens
+                    total_completion_tokens += event.output_tokens
+                else:
+                    yield event  # ImagePartialEvent / ResourceCreatedEvent bubble up to SSE
+            tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result_text})
+
+        # Append skipped tool results
+        tool_results.extend(skipped_results)
+
         chat_messages.append({"role": "user", "content": tool_results})
 
     # Reached max rounds or timeout — do a final call WITHOUT tools
@@ -699,15 +805,16 @@ async def _stream_chat_claude(
             yield text
         final = await stream.get_final_message()
     total_prompt_tokens += final.usage.input_tokens
+    total_completion_tokens += final.usage.output_tokens
     yield TokenUsage(
         prompt_tokens=total_prompt_tokens,
-        completion_tokens=final.usage.output_tokens,
+        completion_tokens=total_completion_tokens,
     )
 
 
 async def _stream_chat_openai(
-    messages: list[dict], model: str, provider: str, identity_prompt: str
-) -> AsyncGenerator[str | TokenUsage | ToolCallEvent, None]:
+    messages: list[dict], model: str, provider: str, identity_prompt: str, tool_context: ToolContext | None = None
+) -> AsyncGenerator[str | TokenUsage | ToolCallEvent | ImagePartialEvent | ResourceCreatedEvent, None]:
     """Streaming with tool call loop for OpenAI-compatible providers (OpenAI, DeepSeek)."""
     client = _get_openai_client(provider)
 
@@ -727,7 +834,9 @@ async def _stream_chat_openai(
 
     tools = _openai_tools()
     total_prompt_tokens = 0
+    total_completion_tokens = 0
     start_time = time.monotonic()
+    file_gen_used = False
 
     for round_idx in range(_MAX_TOOL_ROUNDS):
         if time.monotonic() - start_time > _TOOL_LOOP_TIMEOUT:
@@ -774,9 +883,10 @@ async def _stream_chat_openai(
         if not tool_calls_accum:
             # Final round — no tool calls
             total_prompt_tokens += round_usage.prompt_tokens
+            total_completion_tokens += round_usage.completion_tokens
             yield TokenUsage(
                 prompt_tokens=total_prompt_tokens,
-                completion_tokens=round_usage.completion_tokens,
+                completion_tokens=total_completion_tokens,
             )
             return
 
@@ -817,19 +927,51 @@ async def _stream_chat_openai(
         for tc in parsed_tool_calls:
             yield ToolCallEvent(content=_tool_call_description(tc["name"], tc["arguments"]))
 
-        # Execute tools in parallel
-        results = await asyncio.gather(*[
-            tool_executor.execute(tc["name"], tc["arguments"])
-            for tc in parsed_tool_calls
-        ])
+        # Filter file generation tools (only one per user turn)
+        allowed_tcs = []
+        skipped_results: list[dict] = []
+        for tc in parsed_tool_calls:
+            if tc["name"] in _FILE_GEN_TOOLS:
+                if file_gen_used:
+                    skipped_results.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": "Skipped: only one file generation allowed per request.",
+                    })
+                    continue
+                file_gen_used = True
+            allowed_tcs.append(tc)
 
-        # Add tool result messages (one per tool for OpenAI format)
-        for tc, result in zip(parsed_tool_calls, results):
-            oai_messages.append({
-                "role": "tool",
-                "tool_call_id": tc["id"],
-                "content": result,
-            })
+        # Separate streaming and non-streaming tools
+        streaming_tcs = [tc for tc in allowed_tcs if tc["name"] == "create_image"]
+        normal_tcs = [tc for tc in allowed_tcs if tc["name"] != "create_image"]
+
+        # 1. Execute non-streaming tools in parallel
+        if normal_tcs:
+            results = await asyncio.gather(*[
+                tool_executor.execute(tc["name"], tc["arguments"], tool_context)
+                for tc in normal_tcs
+            ])
+            for tc, (result_text, side_events) in zip(normal_tcs, results):
+                for e in side_events:
+                    yield e
+                oai_messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_text})
+
+        # 2. Execute streaming tools serially
+        for tc in streaming_tcs:
+            result_text = ""
+            async for event in tool_executor.create_image_stream(tc["arguments"], tool_context):
+                if isinstance(event, str):
+                    result_text = event
+                elif isinstance(event, ImageGenUsage):
+                    total_prompt_tokens += event.input_tokens
+                    total_completion_tokens += event.output_tokens
+                else:
+                    yield event
+            oai_messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_text})
+
+        # Append skipped tool results
+        oai_messages.extend(skipped_results)
 
     # Reached max rounds or timeout — do a final call WITHOUT tools
     # so the model summarises whatever tool results it already has.
@@ -860,15 +1002,16 @@ async def _stream_chat_openai(
                 completion_tokens=chunk.usage.completion_tokens,
             )
     total_prompt_tokens += final_usage.prompt_tokens
+    total_completion_tokens += final_usage.completion_tokens
     yield TokenUsage(
         prompt_tokens=total_prompt_tokens,
-        completion_tokens=final_usage.completion_tokens,
+        completion_tokens=total_completion_tokens,
     )
 
 
 async def _stream_chat_gemini(
-    messages: list[dict], model: str, identity_prompt: str
-) -> AsyncGenerator[str | TokenUsage | ToolCallEvent, None]:
+    messages: list[dict], model: str, identity_prompt: str, tool_context: ToolContext | None = None
+) -> AsyncGenerator[str | TokenUsage | ToolCallEvent | ImagePartialEvent | ResourceCreatedEvent, None]:
     """Gemini streaming chat with tool-call loop.
 
     Uses streaming for text generation and non-streaming for tool-call rounds
@@ -897,7 +1040,9 @@ async def _stream_chat_gemini(
     )
 
     total_prompt_tokens = 0
+    total_completion_tokens = 0
     start_time = time.monotonic()
+    file_gen_used = False
 
     for round_idx in range(_MAX_TOOL_ROUNDS):
         if time.monotonic() - start_time > _TOOL_LOOP_TIMEOUT:
@@ -942,9 +1087,10 @@ async def _stream_chat_gemini(
         if not function_call_parts:
             # No tool calls — done.
             total_prompt_tokens += round_usage.prompt_tokens
+            total_completion_tokens += round_usage.completion_tokens
             yield TokenUsage(
                 prompt_tokens=total_prompt_tokens,
-                completion_tokens=round_usage.completion_tokens,
+                completion_tokens=total_completion_tokens,
             )
             return
 
@@ -966,22 +1112,64 @@ async def _stream_chat_gemini(
         assistant_parts.extend(function_call_parts)
         contents.append(genai.types.Content(role="model", parts=assistant_parts))
 
-        # Execute tools in parallel
-        results = await asyncio.gather(*[
-            tool_executor.execute(p.function_call.name, dict(p.function_call.args) if p.function_call.args else {})
-            for p in function_call_parts
-        ])
+        # Filter file generation tools (only one per user turn)
+        allowed_parts = []
+        skipped_result_parts: list[genai.types.Part] = []
+        for p in function_call_parts:
+            if p.function_call.name in _FILE_GEN_TOOLS:
+                if file_gen_used:
+                    skipped_result_parts.append(genai.types.Part(
+                        function_response=genai.types.FunctionResponse(
+                            name=p.function_call.name,
+                            response={"result": "Skipped: only one file generation allowed per request."},
+                        )
+                    ))
+                    continue
+                file_gen_used = True
+            allowed_parts.append(p)
 
-        # Add tool results as user message
-        tool_result_parts = [
-            genai.types.Part(
+        # Separate streaming and non-streaming tools
+        streaming_parts = [p for p in allowed_parts if p.function_call.name == "create_image"]
+        normal_parts = [p for p in allowed_parts if p.function_call.name != "create_image"]
+
+        tool_result_parts: list = []
+
+        # 1. Execute non-streaming tools in parallel
+        if normal_parts:
+            results = await asyncio.gather(*[
+                tool_executor.execute(p.function_call.name, dict(p.function_call.args) if p.function_call.args else {}, tool_context)
+                for p in normal_parts
+            ])
+            for p, (result_text, side_events) in zip(normal_parts, results):
+                for e in side_events:
+                    yield e
+                tool_result_parts.append(genai.types.Part(
+                    function_response=genai.types.FunctionResponse(
+                        name=p.function_call.name, response={"result": result_text},
+                    )
+                ))
+
+        # 2. Execute streaming tools serially
+        for p in streaming_parts:
+            result_text = ""
+            args = dict(p.function_call.args) if p.function_call.args else {}
+            async for event in tool_executor.create_image_stream(args, tool_context):
+                if isinstance(event, str):
+                    result_text = event
+                elif isinstance(event, ImageGenUsage):
+                    total_prompt_tokens += event.input_tokens
+                    total_completion_tokens += event.output_tokens
+                else:
+                    yield event
+            tool_result_parts.append(genai.types.Part(
                 function_response=genai.types.FunctionResponse(
-                    name=p.function_call.name,
-                    response={"result": result},
+                    name=p.function_call.name, response={"result": result_text},
                 )
-            )
-            for p, result in zip(function_call_parts, results)
-        ]
+            ))
+
+        # Append skipped tool results
+        tool_result_parts.extend(skipped_result_parts)
+
         contents.append(genai.types.Content(role="user", parts=tool_result_parts))
 
     # Reached max rounds or timeout — do a final call WITHOUT tools
@@ -1017,9 +1205,10 @@ async def _stream_chat_gemini(
                         if part.text:
                             yield part.text
     total_prompt_tokens += final_usage.prompt_tokens
+    total_completion_tokens += final_usage.completion_tokens
     yield TokenUsage(
         prompt_tokens=total_prompt_tokens,
-        completion_tokens=final_usage.completion_tokens,
+        completion_tokens=total_completion_tokens,
     )
 
 
@@ -1027,24 +1216,26 @@ async def _stream_chat_gemini(
 
 
 async def stream_chat(
-    messages: list[dict], model_index: int
-) -> AsyncGenerator[str | TokenUsage | ToolCallEvent, None]:
+    messages: list[dict], model_index: int, tool_context: ToolContext | None = None
+) -> AsyncGenerator[str | TokenUsage | ToolCallEvent | ImagePartialEvent | ResourceCreatedEvent, None]:
     """Stream chat completion tokens with tool call support.
 
     Yields:
         str: content delta tokens
         ToolCallEvent: when a tool is being executed (for SSE forwarding)
+        ImagePartialEvent: streaming image partial preview (15.2)
+        ResourceCreatedEvent: file registration completed (15.2)
         TokenUsage: final token usage (always the last item yielded)
     """
     provider, model = _resolve_model(model_index)
     identity_prompt = _get_system_prompt(provider)
 
     if provider == "claude":
-        gen = _stream_chat_claude(messages, model, identity_prompt)
+        gen = _stream_chat_claude(messages, model, identity_prompt, tool_context)
     elif provider == "gemini":
-        gen = _stream_chat_gemini(messages, model, identity_prompt)
+        gen = _stream_chat_gemini(messages, model, identity_prompt, tool_context)
     else:
-        gen = _stream_chat_openai(messages, model, provider, identity_prompt)
+        gen = _stream_chat_openai(messages, model, provider, identity_prompt, tool_context)
 
     async for item in gen:
         yield item

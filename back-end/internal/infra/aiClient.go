@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+// ToolContext 由 Go backend 传入的执行上下文，15.2 中 create_image/create_file 使用。
+type ToolContext struct {
+	UserID     int64  `json:"user_id"`
+	CanvasID   int64  `json:"canvas_id"`
+	ChatNodeID string `json:"chat_node_id"`
+	MessageID  string `json:"message_id"` // assistant message ID
+}
+
 // ---------- Request / Response DTOs ----------
 
 type GenerateTitleReq struct {
@@ -41,8 +49,9 @@ type ChatMessage struct {
 }
 
 type StreamChatReq struct {
-	Messages []ChatMessage `json:"messages"`
-	Model    int           `json:"model"`
+	Messages   []ChatMessage `json:"messages"`
+	Model      int           `json:"model"`
+	ToolContext *ToolContext  `json:"tool_context,omitempty"`
 }
 
 type GenerateSummaryReq struct {
@@ -64,10 +73,11 @@ type SSEEvent struct {
 }
 
 type AIStreamEvent struct {
-    Type    string // "token" | "complete" | "error" | "tool_call"
-    Content string // token 内容或完整回复
-    PromptTokens     int
-    CompletionTokens int
+	Type             string          // "token" | "complete" | "error" | "tool_call" | "image_partial" | "resource_created"
+	Content          string          // token 内容或完整回复
+	PromptTokens     int
+	CompletionTokens int
+	RawData          json.RawMessage // 原始 JSON data，用于 image_partial / resource_created 透传
 }
 
 // ---------- AIClient ----------
@@ -165,19 +175,19 @@ func (c *AIClient) GenerateSummary(ctx context.Context, messages []ChatMessage, 
 
 // StreamChat 调用 POST /api/chat/completions，返回 AIStreamEvent channel。
 // 调用方通过 range channel 消费事件，channel 关闭表示流结束。
-func (c *AIClient) StreamChat(ctx context.Context, messages []ChatMessage, model int) (<-chan AIStreamEvent, error) {
-	body, err := json.Marshal(StreamChatReq{Messages: messages, Model: model})
+func (c *AIClient) StreamChat(ctx context.Context, req StreamChatReq) (<-chan AIStreamEvent, error) {
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/chat/completions", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.streamClient.Do(req)
+	resp, err := c.streamClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("ai-service request: %w", err)
 	}
@@ -197,33 +207,56 @@ func (c *AIClient) StreamChat(ctx context.Context, messages []ChatMessage, model
 		defer resp.Body.Close()
 
 		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 2*1024*1024), 2*1024*1024) // 2MB buffer，支持大 base64 payload
 		for scanner.Scan() {
 			line := scanner.Text()
 			if !strings.HasPrefix(line, "data: ") {
 				continue
 			}
+			rawData := line[6:]
 
-			var event SSEEvent
-			if err := json.Unmarshal([]byte(line[6:]), &event); err != nil {
+			// 先提取 type 字段，避免对大 payload 做完整 unmarshal
+			var head struct {
+				Type string `json:"type"`
+			}
+			if err := json.Unmarshal([]byte(rawData), &head); err != nil {
 				continue
 			}
 
 			var out AIStreamEvent
-			switch event.Type {
-			case "token":
-				out = AIStreamEvent{Type: "token", Content: event.Content}
-			case "complete":
-				out = AIStreamEvent{
-					Type:             "complete",
-					PromptTokens:     event.PromptTokens,
-					CompletionTokens: event.CompletionTokens,
+			switch head.Type {
+			case "image_partial", "resource_created":
+				// ai-service sends nested format: {"type": "...", "data": {...}}
+				// Extract inner "data" field to avoid double nesting after dto.SSEEvent wrapping
+				var wrapped struct {
+					Type string          `json:"type"`
+					Data json.RawMessage `json:"data"`
 				}
-			case "tool_call":
-				out = AIStreamEvent{Type: "tool_call", Content: event.Content}
-			case "error":
-				out = AIStreamEvent{Type: "error", Content: event.Message}
+				if err := json.Unmarshal([]byte(rawData), &wrapped); err != nil {
+					continue
+				}
+				out = AIStreamEvent{Type: head.Type, RawData: wrapped.Data}
 			default:
-				continue
+				var event SSEEvent
+				if err := json.Unmarshal([]byte(rawData), &event); err != nil {
+					continue
+				}
+				switch event.Type {
+				case "token":
+					out = AIStreamEvent{Type: "token", Content: event.Content}
+				case "complete":
+					out = AIStreamEvent{
+						Type:             "complete",
+						PromptTokens:     event.PromptTokens,
+						CompletionTokens: event.CompletionTokens,
+					}
+				case "tool_call":
+					out = AIStreamEvent{Type: "tool_call", Content: event.Content}
+				case "error":
+					out = AIStreamEvent{Type: "error", Content: event.Message}
+				default:
+					continue
+				}
 			}
 
 			select {

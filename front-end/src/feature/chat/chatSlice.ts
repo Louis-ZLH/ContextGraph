@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { ChatState, Conversation, Message } from "./types";
+import type { ChatState, Conversation, Message, ImagePreviewState, GeneratedFile } from "./types";
 import { createSelector } from "@reduxjs/toolkit";
 import type { RootState } from "../../store";
 import { shallowEqual } from "react-redux";
@@ -7,6 +7,7 @@ import { shallowEqual } from "react-redux";
 const initialState: ChatState = {
     conversations: {},
     messages: {},
+    imagePreviews: {},
 }
 
 const chatSlice = createSlice({
@@ -196,12 +197,14 @@ const chatSlice = createSlice({
             if (!message || message.status !== "streaming") return;
             message.content = (message.content ?? "") + token;
         },
-        completeStream: (state, action: PayloadAction<{ msgId: string; content: string }>) => {
-            const { msgId, content } = action.payload;
+        completeStream: (state, action: PayloadAction<{ msgId: string; content: string; fileUrl?: string; fileName?: string }>) => {
+            const { msgId, content, fileUrl, fileName } = action.payload;
             const message = state.messages[msgId];
             if (!message || message.role !== "assistant" || message.status !== "streaming") return;
             message.content = content;
             message.status = "completed";
+            if (fileUrl) message.fileUrl = fileUrl;
+            if (fileName) message.fileName = fileName;
         },
         errorStream: (state, action: PayloadAction<{ msgId: string, error: string}>) => {
             const { msgId, error } = action.payload;
@@ -227,6 +230,20 @@ const chatSlice = createSlice({
             const conversation = state.conversations[conversationId];
             if (!conversation) return;
             conversation.title = title;
+        },
+        setImagePreview: (state, action: PayloadAction<ImagePreviewState>) => {
+            state.imagePreviews[action.payload.messageId] = action.payload;
+        },
+        clearImagePreview: (state, action: PayloadAction<string>) => {
+            delete state.imagePreviews[action.payload];
+        },
+        addGeneratedFileToMessage: (state, action: PayloadAction<{ msgId: string, file: GeneratedFile }>) => {
+            const { msgId, file } = action.payload;
+            const message = state.messages[msgId];
+            if (!message) return;
+            const files = (message.metadata.generatedFiles as GeneratedFile[] | undefined) ?? [];
+            files.push(file);
+            message.metadata.generatedFiles = files;
         },
         switchBranch: (state, action: PayloadAction<{ msgId: string, index: number}>) => {
             const { msgId, index } = action.payload;
@@ -397,4 +414,7 @@ export const {
     errorUserMessage,
     updateWaitingStatus,
     updateConversationTitle,
+    setImagePreview,
+    clearImagePreview,
+    addGeneratedFileToMessage,
 } = chatSlice.actions;
