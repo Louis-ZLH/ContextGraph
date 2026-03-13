@@ -42,7 +42,7 @@ export default function LoginPage() {
       return;
     }
     setIsLoading(false);
-    queryClient.removeQueries({ queryKey: ["user", "profile"] });
+    queryClient.clear();
     toast.success(result.message);
     navigate("/canvas");
   };
